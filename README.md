@@ -48,3 +48,13 @@ npm run format:check  # fail if any file is not formatted
 ```
 
 Tests never touch the real home directory; see `test/setup.ts`.
+
+Contributors need Node `>=22.22.1` (`nvm use` reads `.nvmrc`). Git hooks are installed by `npm install` (via Husky):
+
+| Hook         | Runs                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------- |
+| `pre-commit` | Prettier on staged files (lint-staged)                                                              |
+| `commit-msg` | commitlint with Conventional Commits                                                                |
+| `pre-push`   | `npm run typecheck`, `npm run test:changed` (only tests affected vs `origin/main`), `npm run build` |
+
+Bypass hooks with `git commit --no-verify`, `git push --no-verify`, or `HUSKY=0`.
