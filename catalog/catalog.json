@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "items": {
+    "mcps": ["github", "context7"],
+    "profiles": ["base", "web"]
+  }
+}

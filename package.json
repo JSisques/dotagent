@@ -1,0 +1,36 @@
+{
+  "name": "@jsisques/dotagent",
+  "version": "0.0.0",
+  "description": "Portable, configurable AI agent setup (skills, MCPs, etc.) installable via npx.",
+  "type": "module",
+  "bin": {
+    "dotagent-cli": "./dist/main.js"
+  },
+  "files": [
+    "dist",
+    "catalog",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "commander": "^15.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
