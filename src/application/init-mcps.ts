@@ -4,15 +4,15 @@ import { hashEntry, sha256 } from '@/domain/hash.js';
 import type { McpItem } from '@/domain/catalog/schema.js';
 import type { Install, Manifest } from '@/domain/manifest.js';
 import { deriveOwnership, deriveSkillOwnership } from '@/domain/manifest.js';
-import type { SkillFile } from '@/domain/catalog/skill.js';
 import { buildSkillPlan, writesSkill, type SkillChange, type SkillPlanEntry } from '@/domain/plan/skill-plan.js';
 import { buildPlan, replanFile, writesFile } from '@/domain/plan/change-plan.js';
 import type { ChangePlan, FileChange } from '@/domain/plan/change-plan.js';
 import type { AgentTarget, Scope } from '@/ports/agent-target.js';
 import type { CatalogSource } from '@/ports/catalog-source.js';
-import { UnsafeTreeError, type FileSystem } from '@/ports/file-system.js';
+import type { FileSystem } from '@/ports/file-system.js';
 import type { Paths } from '@/ports/paths.js';
 import { appendInstall, loadManifest, stateDir } from './journal.js';
+import { readPresent } from './skill-tree.js';
 
 export interface InitDeps {
   source: CatalogSource;
@@ -40,19 +40,6 @@ export class UnknownSkillError extends Error {}
 export class StaleFileError extends Error {}
 /** A resolved env value would be written to disk. */
 export class LeakError extends Error {}
-
-/** Reads the files at a skill directory; null when it does not exist. Throws UnsafeTreeError on a symlink or a file that vanishes mid-read. */
-async function readPresent(fs: FileSystem, root: string): Promise<SkillFile[] | null> {
-  const paths = await fs.listFiles(root);
-  if (paths === null) return null;
-  const files: SkillFile[] = [];
-  for (const path of paths) {
-    const bytes = await fs.readBytes(`${root}/${path}`);
-    if (bytes === null) throw new UnsafeTreeError(`file vanished while reading: ${root}/${path}`);
-    files.push({ path, bytes });
-  }
-  return files;
-}
 
 export async function planInit(deps: InitDeps, req: InitRequest): Promise<ChangePlan> {
   const catalog = await deps.source.load();

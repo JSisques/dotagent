@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Scope } from '@/ports/agent-target.js';
 
 export class ManifestError extends Error {}
 
@@ -91,4 +92,37 @@ export function deriveSkillOwnership(manifest: Manifest): Record<string, string>
     }
   }
   return owned;
+}
+
+/** One item shitaku currently owns, with the hash it last wrote and the install that wrote it. */
+export interface OwnedItem {
+  kind: 'mcp' | 'skill';
+  scope: Scope;
+  /** Config file for an MCP, skill directory for a skill. */
+  path: string;
+  name: string;
+  hash: string;
+  installId: string;
+}
+
+/** Replays the non-undone installs in order; the newest install of a scope + path + name wins and keeps its install id. */
+export function deriveOwnedItems(manifest: Manifest): OwnedItem[] {
+  const owned = new Map<string, OwnedItem>();
+  for (const install of manifest.installs.filter((i) => i.undoneAt === null)) {
+    for (const file of install.files) {
+      for (const item of file.items) {
+        const path = item.kind === 'skill' ? item.root : file.path;
+        const key = JSON.stringify([file.scope, path, item.name]);
+        owned.set(key, {
+          kind: item.kind,
+          scope: file.scope,
+          path,
+          name: item.name,
+          hash: item.entryHash,
+          installId: install.id,
+        });
+      }
+    }
+  }
+  return [...owned.values()];
 }

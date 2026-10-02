@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deriveOwnedItems,
   deriveOwnership,
   deriveSkillOwnership,
   emptyManifest,
@@ -92,6 +93,52 @@ describe('deriveSkillOwnership', () => {
       manifest([skillInstall('a', root, 'tree1'), skillInstall('b', root, 'tree2'), undone]),
     );
     expect(owned).toEqual({ [root]: 'tree2' });
+  });
+});
+
+describe('deriveOwnedItems', () => {
+  const root = '/h/.claude/skills/demo';
+
+  it('is empty for an empty manifest', () => {
+    expect(deriveOwnedItems(emptyManifest())).toEqual([]);
+  });
+
+  it('lists MCPs by config path and skills by root, each with its install id', () => {
+    const owned = deriveOwnedItems(manifest([install('a', 'github', 'h1'), skillInstall('b', root, 'tree1')]));
+    expect(owned).toEqual([
+      { kind: 'mcp', scope: 'project', path: '/p/.mcp.json', name: 'github', hash: 'h1', installId: 'a' },
+      { kind: 'skill', scope: 'user', path: root, name: 'demo', hash: 'tree1', installId: 'b' },
+    ]);
+  });
+
+  it('excludes undone installs', () => {
+    const undone = install('b', 'github', 'h2', { undoneAt: '2026-10-03T00:00:00.000Z' });
+    expect(deriveOwnedItems(manifest([undone]))).toEqual([]);
+    expect(deriveOwnedItems(manifest([install('a', 'github', 'h1'), undone]))).toEqual([
+      { kind: 'mcp', scope: 'project', path: '/p/.mcp.json', name: 'github', hash: 'h1', installId: 'a' },
+    ]);
+  });
+
+  it('keeps the newest install hash and its install id', () => {
+    const owned = deriveOwnedItems(manifest([install('a', 'github', 'h1'), install('b', 'github', 'h2')]));
+    expect(owned).toEqual([
+      { kind: 'mcp', scope: 'project', path: '/p/.mcp.json', name: 'github', hash: 'h2', installId: 'b' },
+    ]);
+  });
+
+  it('keeps the same name in two scopes apart', () => {
+    const user = install('b', 'fs', 'h2', {
+      files: [{ ...install('b', 'fs', 'h2').files[0]!, path: '/h/.claude.json', scope: 'user' }],
+    });
+    const owned = deriveOwnedItems(manifest([install('a', 'fs', 'h1'), user]));
+    expect(owned.map((o) => [o.scope, o.path, o.hash, o.installId])).toEqual([
+      ['project', '/p/.mcp.json', 'h1', 'a'],
+      ['user', '/h/.claude.json', 'h2', 'b'],
+    ]);
+  });
+
+  it('lists a skill once even though its install records one item per file', () => {
+    expect(deriveOwnedItems(manifest([skillInstall('a', root, 'tree1')]))).toHaveLength(1);
   });
 });
 
