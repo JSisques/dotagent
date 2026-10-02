@@ -16,5 +16,12 @@ export default defineConfig({
     setupFiles: ['test/setup.ts'],
     environment: 'node',
     testTimeout: 15_000,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.d.ts'],
+      reporter: ['text', 'lcov'],
+      thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
+    },
   },
 });

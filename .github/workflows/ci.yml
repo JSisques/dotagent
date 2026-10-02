@@ -29,6 +29,6 @@ jobs:
       - run: pnpm run format:check
       - run: pnpm run docs:catalog:check
       - run: pnpm run typecheck
-      - run: pnpm run test
+      - run: pnpm run test:coverage
       - run: pnpm run build
       - run: pnpm run smoke:pack
