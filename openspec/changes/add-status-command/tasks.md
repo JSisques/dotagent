@@ -36,13 +36,13 @@ Options: stacked-to-main, feature-branch-chain (PR2 base = PR1 branch, PR3 base 
 
 ## PR 2: getStatus use case
 
-- [ ] 2.1 RED: `test/application/status.test.ts` (tmp fs + folder catalog): installed, modified, out-of-date, missing, missing-from-catalog
-- [ ] 2.2 RED: scope filter, foreign config entries ignored, empty manifest, `ManifestError` rejects
-- [ ] 2.3 RED: symlinked skill -> `modified`; corrupt config file -> its items `modified` while other files classify normally
-- [ ] 2.4 RED: catalog load failure -> `unknown`, with `missing`/`modified` preserved; unsupported catalog MCP -> `missing-from-catalog`
-- [ ] 2.5 RED: no writes (fs spy rejects every write method)
-- [ ] 2.6 GREEN: create `src/application/status.ts` with `getStatus`, per-path config read once, unreadable mapping (`UnsafeTreeError`, `EACCES`/`EPERM`, `ConfigError`), sorted output
-- [ ] 2.7 REFACTOR: tidy helpers; all PR 2 tests pass
+- [x] 2.1 RED: `test/application/status.test.ts` (tmp fs + folder catalog): installed, modified, out-of-date, missing, missing-from-catalog
+- [x] 2.2 RED: scope filter, foreign config entries ignored, empty manifest, `ManifestError` rejects
+- [x] 2.3 RED: symlinked skill -> `modified`; corrupt config file -> its items `modified` while other files classify normally
+- [x] 2.4 RED: catalog load failure -> `unknown`, with `missing`/`modified` preserved; unsupported catalog MCP -> `missing-from-catalog`
+- [x] 2.5 RED: no writes (fs spy rejects every write method)
+- [x] 2.6 GREEN: create `src/application/status.ts` with `getStatus`, per-path config read once, unreadable mapping (`UnsafeTreeError`, `EACCES`/`EPERM`, `ConfigError`), sorted output
+- [x] 2.7 REFACTOR: tidy helpers; all PR 2 tests pass
 
 ## PR 3: CLI, renderers, docs
 
