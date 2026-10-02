@@ -79,7 +79,7 @@ export interface StatusReport {
 export function getStatus(deps: StatusDeps, req: { scope?: Scope }): Promise<StatusReport>;
 ```
 
-JSON (stdout only): `{ "version": 1, "target", "catalog", "items": [{ scope, kind, name, state, path, installId }] }`. Catalog issues and load errors go to stderr in both modes. Text: `target: claude-code`, `catalog unavailable` when degraded, then per scope `<scope> scope:` and rows `  <name> (<kind>): <state>  <path>`; `no managed items` when empty. CLI: `status [--scope project|user] [--source <folder>] [--json]`, wrapped in `guarded()`, exit 0.
+JSON (stdout only): `{ "version": 1, "target", "catalog", "items": [{ scope, kind, name, state, path, installId }] }`. Catalog issues and load errors go to stderr in both modes. Text: `target: claude-code`, `catalog unavailable` when degraded, then per scope `<scope> scope:`, a kind sub-header `  mcps:` / `  skills:` (omitted for kinds with no items), and rows `    <name>: <state>  <path>`; `no managed items` when empty. CLI: `status [--scope project|user] [--source <folder>] [--json]`, wrapped in `guarded()`, exit 0.
 
 ## File Changes
 

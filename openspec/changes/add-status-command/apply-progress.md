@@ -61,3 +61,38 @@ Full suite: 21 files, 294 tests passed. typecheck, lint, format:check clean.
 - Final: 26 tests in `status.test.ts`; `status.ts` 131 lines + test 275 lines = 406 (budget ~400, excluding openspec).
 
 Full suite: 320 passed at the last run; typecheck, lint clean; format:check clean for PR 2 files. `verify-report.md` (not authored by apply) fails prettier.
+
+## PR 3: CLI, renderers, docs (complete)
+
+- [x] 3.1 RED text output, `--scope`, degraded `catalog unavailable` header, `no managed items` in `test/adapters/cli/program.test.ts`
+- [x] 3.2 RED JSON shape (`version: 1`, `target`, `catalog`, item fields), catalog issues on stderr only, drift exits 0
+- [x] 3.3 RED corrupt manifest -> `error:` on stderr, no stack trace, exit 1 for `status`, `init`, `undo` (parametrized)
+- [x] 3.4 GREEN `ManifestError` added to `guarded()` known errors
+- [x] 3.5 GREEN `status [--scope] [--source] [--json]`, `printStatus`, `runStatus`, `STATUS_JSON_VERSION = 1`
+- [x] 3.6 README: usage line, `### Status` section (states table, `--json`, exit codes, custom `--source` limitation); dropped the stale "no `list` command" remark
+- [x] 3.7 Full suite and `test/architecture.test.ts` pass
+
+### TDD Cycle Evidence (PR 3)
+
+| Task    | Test File                           | Layer       | Safety Net     | RED                                                    | GREEN                      | TRIANGULATE                                            | REFACTOR |
+| ------- | ----------------------------------- | ----------- | -------------- | ------------------------------------------------------ | -------------------------- | ------------------------------------------------------ | -------- |
+| 3.1-3.3 | `test/adapters/cli/program.test.ts` | Integration | 39/39 baseline | 12 failed (unknown command `status`, no `error:` text) | 51/51 passed after 3.4/3.5 | text, scope, degraded, empty, JSON x3, corrupt x3 cmds | Clean    |
+| 3.4/3.5 | same                                | Integration | same           | covered above                                          | 51/51                      | covered above                                          | Clean    |
+
+Two test expectations were corrected after GREEN (sort order is mcp before skill; the stderr test needed an invalid MCP file to produce a catalog issue). Behavior was not changed.
+
+### Work Unit Evidence (PR 3)
+
+| Evidence             | Value                                                                                                                                                                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focused test command | `pnpm exec vitest run test/adapters/cli/program.test.ts`: 51 passed                                                                                                                                                              |
+| Runtime harness      | built CLI (`node dist/main.js`) in a temp HOME and cwd: init, `status`, `status --json`, edited skill -> `modified`, bad `--source` -> `catalog unavailable`/`unknown`, corrupt manifest -> `error:` exit 1 for status/init/undo |
+| Rollback boundary    | `status` command, `printStatus`/`runStatus`, `STATUS_JSON_VERSION`, `ManifestError` in `guarded()` (`program.ts`); README Status section; new tests                                                                              |
+
+Changed lines: README 25+/1-, `program.ts` 42+, `program.test.ts` 120+ (188 total). Full suite 332 passed (one run showed 1 transient failure not reproduced in 3 reruns). typecheck, lint, format:check, build, smoke:pack clean.
+
+### Verify follow-up (PR 3)
+
+- W1 RED first: `status` text tests rewritten to the grouped layout (4 failed). GREEN: `printStatus` prints a kind sub-header (`  mcps:` / `  skills:`) per scope and rows as `    <name>: <state>  <path>`; kinds with no items print no header; JSON unchanged. README example and wording, spec (grouping sentence) and design (text format) updated.
+- W2: `test/tooling.test.ts` — the two eslint-spawning tests in `lint gate` got a 30_000 ms per-test timeout; nothing else changed.
+- `verify-report.md` formatted with prettier.

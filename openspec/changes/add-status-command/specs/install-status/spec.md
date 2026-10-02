@@ -8,7 +8,7 @@ A read-only `shitaku status` command that reports every active, shitaku-managed 
 
 ### Requirement: Manifest-driven read-only report
 
-`status` MUST list only items recorded by installs with `undoneAt === null`. It MUST NOT write to configs, skill directories, backups, or the manifest. Each item MUST carry `kind` (`mcp` or `skill`; the model MUST allow further kinds), `name`, `scope`, `state`, `path`, and `installId`. Items MUST be keyed by scope, path, and name. The output MUST show the agent target.
+`status` MUST list only items recorded by installs with `undoneAt === null`. It MUST NOT write to configs, skill directories, backups, or the manifest. Each item MUST carry `kind` (`mcp` or `skill`; the model MUST allow further kinds), `name`, `scope`, `state`, `path`, and `installId`. Items MUST be keyed by scope, path, and name. The output MUST show the agent target. Text output MUST group items by scope, then by kind.
 
 #### Scenario: Active items listed
 

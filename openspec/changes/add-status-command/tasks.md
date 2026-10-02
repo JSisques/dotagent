@@ -46,10 +46,10 @@ Options: stacked-to-main, feature-branch-chain (PR2 base = PR1 branch, PR3 base 
 
 ## PR 3: CLI, renderers, docs
 
-- [ ] 3.1 RED: `test/adapters/cli/program.test.ts` text output, `--scope`, degraded `catalog unavailable` header, `no managed items`
-- [ ] 3.2 RED: JSON shape (`version: 1`, `target`, `catalog`, item fields) with issues on stderr only; drift exits 0
-- [ ] 3.3 RED: corrupt manifest -> stderr `error:` and exit 1 for `status`, `init`, and `undo` (no stack trace)
-- [ ] 3.4 GREEN: add `ManifestError` to `guarded()` known errors in `src/adapters/cli/program.ts`
-- [ ] 3.5 GREEN: add `status [--scope] [--source] [--json]` command, renderers, `STATUS_JSON_VERSION = 1` in `src/adapters/cli/program.ts`
-- [ ] 3.6 Document `status`, states, `--json`, and the custom-source limitation in `README.md`
-- [ ] 3.7 Run full suite and `test/architecture.test.ts`
+- [x] 3.1 RED: `test/adapters/cli/program.test.ts` text output, `--scope`, degraded `catalog unavailable` header, `no managed items`
+- [x] 3.2 RED: JSON shape (`version: 1`, `target`, `catalog`, item fields) with issues on stderr only; drift exits 0
+- [x] 3.3 RED: corrupt manifest -> stderr `error:` and exit 1 for `status`, `init`, and `undo` (no stack trace)
+- [x] 3.4 GREEN: add `ManifestError` to `guarded()` known errors in `src/adapters/cli/program.ts`
+- [x] 3.5 GREEN: add `status [--scope] [--source] [--json]` command, renderers, `STATUS_JSON_VERSION = 1` in `src/adapters/cli/program.ts`
+- [x] 3.6 Document `status`, states, `--json`, and the custom-source limitation in `README.md`
+- [x] 3.7 Run full suite and `test/architecture.test.ts`
