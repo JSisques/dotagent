@@ -15,7 +15,7 @@ const ROOTS = [
   'openspec/config.yaml',
   'README.md',
   'package.json',
-  'package-lock.json',
+  'pnpm-lock.yaml',
 ];
 
 function walk(path: string): string[] {

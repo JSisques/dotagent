@@ -1,5 +1,5 @@
 // Packed-install smoke test: packs the package, installs it in a temp dir and runs the binary.
-// It does not build: run `npm run build` first. It needs network access for `npm install`.
+// It does not build: run `pnpm run build` first. It needs network access for `npm install`.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +31,7 @@ function assertHelp(label, stdout) {
 
 function main() {
   if (!existsSync(join(root, 'dist', 'main.js'))) {
-    console.error('smoke-pack: dist/main.js is missing; run `npm run build` first');
+    console.error('smoke-pack: dist/main.js is missing; run `pnpm run build` first');
     return 1;
   }
   const tmp = mkdtempSync(join(tmpdir(), 'shitaku-smoke-'));

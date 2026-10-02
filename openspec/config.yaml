@@ -9,9 +9,10 @@ strict_tdd: false
 strict_tdd_note: >
   No project marker discovered and no workspace-level test command exists yet.
   Planned Vitest is not installed. Re-run sdd-init after adding a "test" script
-  (e.g. vitest run) to enable strict TDD.
+  (e.g. `pnpm test`) to enable strict TDD.
 projects: []
 testing:
+  command: pnpm test
   runner: null
   planned_runner: vitest
   layers:
@@ -20,8 +21,8 @@ testing:
     e2e: false
   coverage: false
   linter: null
-  type_checker: null
-  formatter: prettier
+  type_checker: pnpm run typecheck
+  formatter: pnpm run format:check
 rules:
   proposal:
     - Include rollback plan and affected hexagonal layers
@@ -34,6 +35,6 @@ rules:
   apply:
     - Follow hexagonal boundaries; write tests first once Vitest is installed
   verify:
-    - Run the Vitest suite once it exists
+    - Run the Vitest suite (`pnpm test`) once it exists
   archive:
     - Merge delta specs into openspec/specs before archiving
