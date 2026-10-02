@@ -1,5 +1,16 @@
+# Node
 node_modules/
 dist/
+
+# Tests
 coverage/
 *.tgz
+
+# macOS
 .DS_Store
+
+# Gentle AI
+.atl
+
+# Environment variables
+.env
