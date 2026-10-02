@@ -4,17 +4,19 @@
 
 <!--
   Badges that are intentionally NOT here yet (add them when their dependency lands):
-  TODO(npm publish): npm version and npm downloads badges (shields.io/npm/v and /npm/dm for @jsisques/shitaku).
-  TODO(website): website badge/link once the docs site exists.
+  TODO(npm downloads): shields.io/npm/dm/@jsisques/shitaku shows "package not found or too new" for a freshly published
+  package; add it once npm download stats exist.
+  TODO(website): website badge/link once the docs site exists (#52).
 -->
 
+[![npm version](https://img.shields.io/npm/v/@jsisques/shitaku)](https://www.npmjs.com/package/@jsisques/shitaku)
 [![CI](https://github.com/JSisques/shitaku/actions/workflows/ci.yml/badge.svg)](https://github.com/JSisques/shitaku/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.13-339933?logo=node.js&logoColor=white)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <!--
-  TODO(demo): add a GIF or screenshot of `shitaku init` running here, e.g.
+  TODO(demo) (#75): add a GIF or screenshot of `shitaku init` running here, e.g.
   ![shitaku init demo](docs/assets/demo.gif)
   Not recorded yet; do not embed a path that does not exist.
 -->
