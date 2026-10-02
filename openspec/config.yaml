@@ -1,27 +1,29 @@
 schema: spec-driven
 context: |
-  Project: shitaku (planned npm package @jsisques/shitaku).
-  Status: greenfield; only README.md exists. No package.json yet.
-  Planned stack: Node LTS, TypeScript (ESM), Vitest.
-  Architecture: hexagonal (ports and adapters).
+  Project: shitaku (npm package @jsisques/shitaku).
+  Purpose: CLI that installs portable AI agent setups (skills, MCPs) via npx.
+  Stack: Node >=22, TypeScript 7 (ESM, strict, NodeNext, verbatimModuleSyntax), commander, @clack/prompts, zod.
+  Architecture: hexagonal (ports and adapters) under src/: domain, application, ports,
+  adapters/{catalog,claude-code,cli,fs}. Boundaries are enforced by test/architecture.test.ts.
+  Path aliases: "@/" (src) and "@test/" (test).
+  Conventions: prettier (printWidth 120, singleQuote, trailingComma all), conventional commits (commitlint),
+  husky (pre-commit lint-staged; pre-push typecheck, test:changed, build).
   Artifacts language: English.
-strict_tdd: false
+strict_tdd: true
 strict_tdd_note: >
-  No project marker discovered and no workspace-level test command exists yet.
-  Planned Vitest is not installed. Re-run sdd-init after adding a "test" script
-  (e.g. vitest run) to enable strict TDD.
+  Workspace-level test command exists: "npm test" (vitest run).
 projects: []
 testing:
-  runner: null
-  planned_runner: vitest
+  runner: vitest
+  command: npm test
   layers:
-    unit: false
+    unit: true
     integration: false
     e2e: false
   coverage: false
   linter: null
-  type_checker: null
-  formatter: prettier
+  type_checker: npm run typecheck
+  formatter: npm run format:check
 rules:
   proposal:
     - Include rollback plan and affected hexagonal layers
@@ -32,8 +34,8 @@ rules:
   tasks:
     - Forecast the 400-line review budget
   apply:
-    - Follow hexagonal boundaries; write tests first once Vitest is installed
+    - Follow hexagonal boundaries; write tests first (strict TDD)
   verify:
-    - Run the Vitest suite once it exists
+    - Run npm test, npm run typecheck and npm run format:check
   archive:
     - Merge delta specs into openspec/specs before archiving
