@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { basename } from 'node:path';
+import { basename, dirname } from 'node:path';
 import { hashEntry, sha256 } from '@/domain/hash.js';
 import type { McpItem } from '@/domain/catalog/schema.js';
 import type { Install, Manifest } from '@/domain/manifest.js';
 import { deriveOwnership, deriveSkillOwnership } from '@/domain/manifest.js';
 import type { SkillFile } from '@/domain/catalog/skill.js';
-import { buildSkillPlan, type SkillPlanEntry } from '@/domain/plan/skill-plan.js';
+import { buildSkillPlan, writesSkill, type SkillChange, type SkillPlanEntry } from '@/domain/plan/skill-plan.js';
 import { buildPlan, replanFile, writesFile } from '@/domain/plan/change-plan.js';
 import type { ChangePlan, FileChange } from '@/domain/plan/change-plan.js';
 import type { AgentTarget, Scope } from '@/ports/agent-target.js';
@@ -71,6 +71,7 @@ export async function planInit(deps: InitDeps, req: InitRequest): Promise<Change
     entries.push({
       skill: catalog.skills.find((sk) => sk.name === name)!,
       root,
+      scope: req.scope,
       present: await readPresent(deps.fs, root),
     });
   }
@@ -126,47 +127,188 @@ function assertNoLeak(plan: ChangePlan, files: FileChange[], env: InitDeps['env'
   }
 }
 
-/** Re-reads, scans for leaked values, backs up, writes atomically and journals every changed file. */
+/** Re-reads each writable skill directory; re-plans once if it changed, aborting when the action differs. */
+async function refreshSkill(deps: InitDeps, change: SkillChange, owned: Record<string, string>, force: boolean) {
+  const fresh = await readPresent(deps.fs, change.root);
+  const [replanned] = buildSkillPlan({
+    skills: [
+      {
+        skill: { name: change.name, description: '', files: change.files },
+        root: change.root,
+        scope: change.scope,
+        present: fresh,
+      },
+    ],
+    owned,
+    force,
+  });
+  if (replanned!.action !== change.action) throw new StaleFileError(`${change.root} changed since planning, re-run`);
+  return replanned!;
+}
+
+/** One file write or removal of a skill, with the bytes needed to record and undo it. */
+interface SkillStep {
+  path: string;
+  change: SkillChange;
+  /** Bytes the apply writes; null when the file is deleted. */
+  after: Uint8Array | null;
+  before: Uint8Array | null;
+}
+
+const SKILL_ENTRY = 'SKILL.md';
+
+/** Per skill: writes first, deletions next, SKILL.md last so a half-written skill never loads. */
+function skillSteps(change: SkillChange): SkillStep[] {
+  const before = new Map(change.present.map((f) => [f.path, f.bytes]));
+  const step = (path: string, after: Uint8Array | null): SkillStep => ({
+    path: `${change.root}/${path}`,
+    change,
+    after,
+    before: before.get(path) ?? null,
+  });
+  const writes = change.files.filter((f) => f.path !== SKILL_ENTRY).map((f) => step(f.path, f.bytes));
+  const removals = change.removed.map((p) => step(p, null));
+  const entry = change.files.filter((f) => f.path === SKILL_ENTRY).map((f) => step(f.path, f.bytes));
+  return [...writes, ...removals, ...entry];
+}
+
+/** Directories that do not exist yet and that writing these paths will create, parents first. */
+async function missingDirs(fs: FileSystem, paths: string[]): Promise<string[]> {
+  const found = new Set<string>();
+  for (const path of paths) {
+    const chain: string[] = [];
+    for (let dir = dirname(path); !found.has(dir) && !(await fs.exists(dir)); dir = dirname(dir)) chain.push(dir);
+    for (const dir of chain.reverse()) found.add(dir);
+  }
+  return [...found];
+}
+
+/** Puts a text file back as it was; deletes it when it did not exist. */
+const restoreText = (fs: FileSystem, path: string, before: string | null): Promise<void> =>
+  before === null ? fs.remove(path) : fs.writeAtomic(path, before);
+
+const restoreBytes = (fs: FileSystem, path: string, before: Uint8Array | null): Promise<void> =>
+  before === null ? fs.remove(path) : fs.writeBytes(path, before);
+
+/**
+ * Reverts the completed writes newest first, then removes the directories the install created, deepest first.
+ * Every step is attempted; the original error is returned, annotated when some step could not be reverted.
+ * Backups stay on disk.
+ */
+async function rollback(
+  fs: FileSystem,
+  undo: (() => Promise<void>)[],
+  dirs: string[],
+  cause: unknown,
+): Promise<unknown> {
+  const failures: string[] = [];
+  const attempt = async (run: () => Promise<unknown>): Promise<void> => {
+    try {
+      await run();
+    } catch (e) {
+      failures.push(e instanceof Error ? e.message : String(e));
+    }
+  };
+  for (const step of undo.reverse()) await attempt(step);
+  for (const dir of dirs) await attempt(() => fs.removeDir(dir));
+  if (failures.length === 0) return cause;
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return new Error(`${message}; rollback incomplete: ${failures.join('; ')}`, { cause });
+}
+
+/** Re-reads, scans for leaked values, backs up, writes atomically and journals every changed file and skill. */
 export async function applyPlan(deps: InitDeps, plan: ChangePlan, opts: { force?: boolean } = {}): Promise<boolean> {
   const { homeDir } = deps.paths;
-  const ownership = deriveOwnership(await loadManifest(deps.fs, homeDir));
+  const force = opts.force ?? false;
+  const manifest = await loadManifest(deps.fs, homeDir);
+  const ownership = deriveOwnership(manifest);
   const files: FileChange[] = [];
   for (const file of plan.files.filter(writesFile))
-    files.push(await refresh(deps, file, ownership[file.path] ?? {}, opts.force ?? false));
-  if (files.length === 0) return false;
+    files.push(await refresh(deps, file, ownership[file.path] ?? {}, force));
+  const skillOwners = deriveSkillOwnership(manifest);
+  const skills: SkillChange[] = [];
+  for (const change of plan.skills.filter(writesSkill))
+    skills.push(await refreshSkill(deps, change, skillOwners, force));
+  if (files.length === 0 && skills.length === 0) return false;
   assertNoLeak(plan, files, deps.env);
 
   const now = (deps.now ?? (() => new Date()))();
   const id = `${now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')}-${randomBytes(2).toString('hex')}`;
+  const steps = skills.flatMap(skillSteps);
+  const createdDirs = await missingDirs(
+    deps.fs,
+    steps.filter((s) => s.after !== null).map((s) => s.path),
+  );
+
+  let n = 0;
   const installed: Install['files'] = [];
-  for (const [n, file] of files.entries()) {
-    const backup = file.before === null ? null : `backups/${id}/${n}-${basename(file.path)}`;
-    if (backup !== null) await deps.fs.writeAtomic(`${stateDir(homeDir)}/${backup}`, file.before!);
-    await deps.fs.writeAtomic(file.path, file.after);
-    const written = file.items.filter((i) => i.action === 'create' || i.action === 'update');
-    installed.push({
-      path: file.path,
-      scope: file.scope,
-      backup,
-      beforeHash: file.beforeHash,
-      afterHash: sha256(file.after),
-      items: written.map((i) => ({
-        kind: 'mcp',
-        name: i.name,
-        action: i.action as 'create' | 'update',
-        entryHash: hashEntry(i.entry),
-      })),
-    });
+  const state = stateDir(homeDir);
+  const mcpBackups = new Map<FileChange, string | null>();
+  for (const file of files) {
+    const backup = file.before === null ? null : `backups/${id}/${n++}-${basename(file.path)}`;
+    if (backup !== null) await deps.fs.writeAtomic(`${state}/${backup}`, file.before!);
+    mcpBackups.set(file, backup);
   }
-  const source = deps.source.ref();
-  await appendInstall(deps.fs, homeDir, {
-    id,
-    createdAt: now.toISOString(),
-    undoneAt: null,
-    source: { ...source, catalogVersion: 1 },
-    files: installed,
-    createdDirs: [],
-  });
+  const skillBackups = new Map<SkillStep, string | null>();
+  for (const step of steps) {
+    const backup = step.before === null ? null : `backups/${id}/${n++}-${basename(step.path)}`;
+    if (backup !== null) await deps.fs.writeBytes(`${state}/${backup}`, step.before!);
+    skillBackups.set(step, backup);
+  }
+
+  const undo: (() => Promise<void>)[] = [];
+  try {
+    for (const file of files) {
+      await deps.fs.writeAtomic(file.path, file.after);
+      undo.push(() => restoreText(deps.fs, file.path, file.before));
+      const written = file.items.filter((i) => i.action === 'create' || i.action === 'update');
+      installed.push({
+        path: file.path,
+        scope: file.scope,
+        backup: mcpBackups.get(file)!,
+        beforeHash: file.beforeHash,
+        afterHash: sha256(file.after),
+        items: written.map((i) => ({
+          kind: 'mcp',
+          name: i.name,
+          action: i.action as 'create' | 'update',
+          entryHash: hashEntry(i.entry),
+        })),
+      });
+    }
+    for (const step of steps) {
+      if (step.after === null) await deps.fs.remove(step.path);
+      else await deps.fs.writeBytes(step.path, step.after);
+      undo.push(() => restoreBytes(deps.fs, step.path, step.before));
+      installed.push({
+        path: step.path,
+        scope: step.change.scope,
+        backup: skillBackups.get(step)!,
+        beforeHash: step.before === null ? null : sha256(step.before),
+        afterHash: step.after === null ? null : sha256(step.after),
+        items: [
+          {
+            kind: 'skill',
+            name: step.change.name,
+            action: step.change.action as 'create' | 'update',
+            entryHash: step.change.desiredHash,
+            root: step.change.root,
+          },
+        ],
+      });
+    }
+    const source = deps.source.ref();
+    await appendInstall(deps.fs, homeDir, {
+      id,
+      createdAt: now.toISOString(),
+      undoneAt: null,
+      source: { ...source, catalogVersion: 1 },
+      files: installed,
+      createdDirs,
+    });
+  } catch (error) {
+    throw await rollback(deps.fs, undo, [...createdDirs].reverse(), error);
+  }
   return true;
 }
 

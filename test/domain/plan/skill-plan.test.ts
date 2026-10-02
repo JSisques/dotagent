@@ -45,7 +45,7 @@ describe('classifySkill', () => {
 
 describe('buildSkillPlan', () => {
   const plan = (present: SkillFile[] | null, owned: Record<string, string> = {}, force = false) =>
-    buildSkillPlan({ skills: [{ skill: skill('demo', v2), root, present }], owned, force });
+    buildSkillPlan({ skills: [{ skill: skill('demo', v2), root, scope: 'project', present }], owned, force });
 
   it('plans a create with the desired files, hashes and no removals', () => {
     const [change] = plan(null);
@@ -59,6 +59,10 @@ describe('buildSkillPlan', () => {
       presentHash: null,
       desiredHash: hash(v2),
     });
+  });
+
+  it('carries the scope of the entry into the change', () => {
+    expect(plan(null)[0]?.scope).toBe('project');
   });
 
   it('plans a skip for an identical tree', () => {
