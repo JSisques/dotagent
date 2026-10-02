@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { claudeCodeTarget as target } from '../../../src/adapters/claude-code/target.js';
-import { McpItemSchema } from '../../../src/domain/catalog/schema.js';
+import { claudeCodeTarget as target } from '@/adapters/claude-code/target.js';
+import { McpItemSchema } from '@/domain/catalog/schema.js';
 
 const http = McpItemSchema.parse({
   name: 'github',

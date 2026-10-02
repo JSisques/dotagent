@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { claudeCodeTarget as target } from '../../../src/adapters/claude-code/target.js';
-import { McpItemSchema } from '../../../src/domain/catalog/schema.js';
-import { ConfigError } from '../../../src/domain/json-merge.js';
-import { buildPlan } from '../../../src/domain/plan/change-plan.js';
+import { claudeCodeTarget as target } from '@/adapters/claude-code/target.js';
+import { McpItemSchema } from '@/domain/catalog/schema.js';
+import { ConfigError } from '@/domain/json-merge.js';
+import { buildPlan } from '@/domain/plan/change-plan.js';
 
 const github = McpItemSchema.parse({
   name: 'github',

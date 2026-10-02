@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { extractPlaceholders, hasPlaceholder } from '../placeholders.js';
+import { extractPlaceholders, hasPlaceholder } from '@/domain/placeholders.js';
 
 const VarName = /^[A-Z_][A-Z0-9_]*$/;
 

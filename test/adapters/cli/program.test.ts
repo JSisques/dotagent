@@ -1,12 +1,12 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FolderCatalogSource } from '../../../src/adapters/catalog/folder-source.js';
-import { runCli, type CliDeps } from '../../../src/adapters/cli/program.js';
-import { claudeCodeTarget } from '../../../src/adapters/claude-code/target.js';
-import { NodeFileSystem } from '../../../src/adapters/fs/node-fs.js';
-import { PromptCancelled, type Prompter } from '../../../src/ports/prompter.js';
-import { makeTmpPaths, type TmpPaths } from '../../helpers/tmp-paths.js';
+import { FolderCatalogSource } from '@/adapters/catalog/folder-source.js';
+import { runCli, type CliDeps } from '@/adapters/cli/program.js';
+import { claudeCodeTarget } from '@/adapters/claude-code/target.js';
+import { NodeFileSystem } from '@/adapters/fs/node-fs.js';
+import { PromptCancelled, type Prompter } from '@/ports/prompter.js';
+import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 const CATALOG = join(import.meta.dirname, '..', '..', '..', 'catalog');
 const TOKEN = 'abc123-secret-value';

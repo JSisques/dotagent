@@ -23,3 +23,13 @@ Completed: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 5.1. Pending: Phase 4 (4.1-4.
 ## Notes
 
 - Task 3.2 baseline `format:check` warns only for untracked openspec artifacts at the time; prettier applied afterwards.
+
+## PR 2 (branch feat/import-aliases-codemod, stacked on feat/import-aliases-wiring) - Mode: Standard
+
+Completed: 4.1, 4.2, 4.3, 4.4, 4.5. All tasks done (PR 1: 1.1-1.3, 2.x, 3.x, 5.1).
+
+- Pre-codemod count: 26 files / 90 specifiers with a real `../` specifier (`rg -l "\.\./" src test` gives 27 because `src/main.ts` has the `new URL('../catalog/', ...)` expression, which is untouched).
+- RED: no-`../` guard failed before codemod (1 failed, 8 passed); GREEN after.
+- Codemod: one-off script (uncommitted, scratchpad) rewriting `from`/`import(`/side-effect `import`/`vi.mock` specifiers starting with `../`; src targets -> `@/`, test targets -> `@test/`; abort on out-of-tree. Result: 90 specifiers in 26 files. Prettier then ran on those files.
+- Verification: `npm run typecheck` ok; `npx vitest run` 14 files, 111 tests passed; `npm run build` ok (dist guard 21 files clean); `npm run smoke:pack` ok (both checks); `rg -n "from '\.\./|import\('\.\./" src test` empty; `prettier --check src test` clean; `src/main.ts` unchanged.
+- Rollback boundary: revert the PR 2 commit(s) alone.

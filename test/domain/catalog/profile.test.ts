@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { resolveProfile, validateProfiles } from '../../../src/domain/catalog/profile.js';
-import type { Profile } from '../../../src/domain/catalog/schema.js';
+import { resolveProfile, validateProfiles } from '@/domain/catalog/profile.js';
+import type { Profile } from '@/domain/catalog/schema.js';
 
 const p = (name: string, mcps: string[] = [], ext: string[] = []): Profile => ({ name, mcps, extends: ext });
 const MCPS = ['github', 'context7'];

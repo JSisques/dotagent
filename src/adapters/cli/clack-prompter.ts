@@ -1,9 +1,9 @@
 import { confirm, isCancel, log, multiselect, select } from '@clack/prompts';
-import type { McpItem } from '../../domain/catalog/schema.js';
-import type { ChangePlan, PlannedItem } from '../../domain/plan/change-plan.js';
-import type { Scope } from '../../ports/agent-target.js';
-import { PromptCancelled } from '../../ports/prompter.js';
-import type { Prompter } from '../../ports/prompter.js';
+import type { McpItem } from '@/domain/catalog/schema.js';
+import type { ChangePlan, PlannedItem } from '@/domain/plan/change-plan.js';
+import type { Scope } from '@/ports/agent-target.js';
+import { PromptCancelled } from '@/ports/prompter.js';
+import type { Prompter } from '@/ports/prompter.js';
 
 /** Unwraps a clack answer, turning a dismissed prompt into PromptCancelled. */
 function answer<T>(value: T | symbol): T {

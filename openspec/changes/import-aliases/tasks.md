@@ -42,11 +42,11 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Codemod (commit 2)
 
-- [ ] 4.1 RED: add no-`../` specifier guard in `test/architecture.test.ts` (fails before codemod).
-- [ ] 4.2 Count files with a `../` specifier before rewriting (design says 28, validator counted 27) and record the count.
-- [ ] 4.3 Run one-off codemod (uncommitted) over `src/**/*.ts` and `test/**/*.ts`: rewrite `../` in import/export/side-effect/dynamic import/`vi.mock`; abort on out-of-tree targets; leave `./`, `new URL('../catalog/', ...)`, `join(import.meta.dirname, '..')`.
-- [ ] 4.4 Run `prettier --write` on changed files; put the codemod command in the commit body.
-- [ ] 4.5 Verify: typecheck, vitest (guard now GREEN), build, `smoke:pack`; confirm `src/main.ts` URL expression unchanged.
+- [x] 4.1 RED: add no-`../` specifier guard in `test/architecture.test.ts` (fails before codemod).
+- [x] 4.2 Count files with a `../` specifier before rewriting (design says 28, validator counted 27) and record the count. Recorded: 26 files with a real `../` specifier (90 specifiers); `rg -l` gave 27 including the `src/main.ts` URL expression.
+- [x] 4.3 Run one-off codemod (uncommitted) over `src/**/*.ts` and `test/**/*.ts`: rewrite `../` in import/export/side-effect/dynamic import/`vi.mock`; abort on out-of-tree targets; leave `./`, `new URL('../catalog/', ...)`, `join(import.meta.dirname, '..')`.
+- [x] 4.4 Run `prettier --write` on changed files; put the codemod command in the commit body.
+- [x] 4.5 Verify: typecheck, vitest (guard now GREEN), build, `smoke:pack`; confirm `src/main.ts` URL expression unchanged.
 
 ## Phase 5: Docs
 

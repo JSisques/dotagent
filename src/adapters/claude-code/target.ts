@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import type { McpItem } from '../../domain/catalog/schema.js';
-import type { AgentTarget, McpServerEntry } from '../../ports/agent-target.js';
+import type { McpItem } from '@/domain/catalog/schema.js';
+import type { AgentTarget, McpServerEntry } from '@/ports/agent-target.js';
 
 export const claudeCodeTarget: AgentTarget = {
   id: 'claude-code',

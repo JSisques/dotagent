@@ -1,14 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { basename } from 'node:path';
-import { hashEntry, sha256 } from '../domain/hash.js';
-import type { Install } from '../domain/manifest.js';
-import { deriveOwnership } from '../domain/manifest.js';
-import { buildPlan, replanFile, writesFile } from '../domain/plan/change-plan.js';
-import type { ChangePlan, FileChange } from '../domain/plan/change-plan.js';
-import type { AgentTarget, Scope } from '../ports/agent-target.js';
-import type { CatalogSource } from '../ports/catalog-source.js';
-import type { FileSystem } from '../ports/file-system.js';
-import type { Paths } from '../ports/paths.js';
+import { hashEntry, sha256 } from '@/domain/hash.js';
+import type { Install } from '@/domain/manifest.js';
+import { deriveOwnership } from '@/domain/manifest.js';
+import { buildPlan, replanFile, writesFile } from '@/domain/plan/change-plan.js';
+import type { ChangePlan, FileChange } from '@/domain/plan/change-plan.js';
+import type { AgentTarget, Scope } from '@/ports/agent-target.js';
+import type { CatalogSource } from '@/ports/catalog-source.js';
+import type { FileSystem } from '@/ports/file-system.js';
+import type { Paths } from '@/ports/paths.js';
 import { appendInstall, loadManifest, stateDir } from './journal.js';
 
 export interface InitDeps {

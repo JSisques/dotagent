@@ -1,7 +1,7 @@
 import { sha256 } from '@/domain/hash.js';
-import type { Install, InstalledFile, Manifest } from '../domain/manifest.js';
-import type { FileSystem } from '../ports/file-system.js';
-import type { Paths } from '../ports/paths.js';
+import type { Install, InstalledFile, Manifest } from '@/domain/manifest.js';
+import type { FileSystem } from '@/ports/file-system.js';
+import type { Paths } from '@/ports/paths.js';
 import { loadManifest, saveManifest, stateDir } from './journal.js';
 
 export interface UndoDeps {

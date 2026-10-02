@@ -1,15 +1,15 @@
 import { Command, CommanderError, Option } from 'commander';
-import { planInit, applyPlan, LeakError, StaleFileError, UnknownMcpError } from '../../application/init-mcps.js';
-import type { InitDeps } from '../../application/init-mcps.js';
-import { undoInstall, UndoSelectionError, UndoVerifyError } from '../../application/undo-install.js';
-import { ConfigError } from '../../domain/json-merge.js';
-import type { ChangePlan } from '../../domain/plan/change-plan.js';
-import type { AgentTarget, Scope } from '../../ports/agent-target.js';
-import type { CatalogSource } from '../../ports/catalog-source.js';
-import type { FileSystem } from '../../ports/file-system.js';
-import type { Paths } from '../../ports/paths.js';
-import { PromptCancelled } from '../../ports/prompter.js';
-import type { Prompter } from '../../ports/prompter.js';
+import { planInit, applyPlan, LeakError, StaleFileError, UnknownMcpError } from '@/application/init-mcps.js';
+import type { InitDeps } from '@/application/init-mcps.js';
+import { undoInstall, UndoSelectionError, UndoVerifyError } from '@/application/undo-install.js';
+import { ConfigError } from '@/domain/json-merge.js';
+import type { ChangePlan } from '@/domain/plan/change-plan.js';
+import type { AgentTarget, Scope } from '@/ports/agent-target.js';
+import type { CatalogSource } from '@/ports/catalog-source.js';
+import type { FileSystem } from '@/ports/file-system.js';
+import type { Paths } from '@/ports/paths.js';
+import { PromptCancelled } from '@/ports/prompter.js';
+import type { Prompter } from '@/ports/prompter.js';
 
 /** Everything the CLI touches, injected by the composition root (or by tests). */
 export interface CliDeps {

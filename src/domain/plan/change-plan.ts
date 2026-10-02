@@ -1,8 +1,8 @@
-import type { AgentTarget, McpServerEntry, Scope } from '../../ports/agent-target.js';
+import type { AgentTarget, McpServerEntry, Scope } from '@/ports/agent-target.js';
 import type { Paths } from '@/ports/paths.js';
-import type { McpItem } from '../catalog/schema.js';
-import { hashEntry, sha256 } from '../hash.js';
-import { mergeAtPath, readAtPath } from '../json-merge.js';
+import type { McpItem } from '@/domain/catalog/schema.js';
+import { hashEntry, sha256 } from '@/domain/hash.js';
+import { mergeAtPath, readAtPath } from '@/domain/json-merge.js';
 
 export type Action = 'create' | 'update' | 'skip' | 'conflict';
 

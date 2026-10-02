@@ -1,4 +1,4 @@
-import type { Catalog } from '../domain/catalog/schema.js';
+import type { Catalog } from '@/domain/catalog/schema.js';
 
 export interface SourceRef {
   kind: 'bundled' | 'folder';

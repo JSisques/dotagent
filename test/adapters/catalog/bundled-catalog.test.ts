@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { FolderCatalogSource } from '../../../src/adapters/catalog/folder-source.js';
-import { resolveProfile } from '../../../src/domain/catalog/profile.js';
+import { FolderCatalogSource } from '@/adapters/catalog/folder-source.js';
+import { resolveProfile } from '@/domain/catalog/profile.js';
 
 describe('bundled catalog', () => {
   it('loads without issues and resolves profiles', async () => {

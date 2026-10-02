@@ -49,6 +49,12 @@ describe('architecture guards', () => {
     expect(importing(files, '@test/')).toEqual([]);
   });
 
+  it('uses no ../ module specifiers in src or test', () => {
+    const parent = (all: { path: string; text: string }[]): string[] =>
+      all.filter((f) => specifiers(f.text).some((s) => s.startsWith('../'))).map((f) => f.path);
+    expect([...parent(files), ...parent(testFiles)]).toEqual([]);
+  });
+
   it('keeps src/domain free of @/adapters and @/application', () => {
     const domain = files.filter((f) => f.path.startsWith('domain/'));
     expect([...importing(domain, '@/adapters'), ...importing(domain, '@/application')]).toEqual([]);

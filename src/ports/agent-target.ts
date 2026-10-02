@@ -1,4 +1,4 @@
-import type { McpItem } from '../domain/catalog/schema.js';
+import type { McpItem } from '@/domain/catalog/schema.js';
 import type { Paths } from './paths.js';
 
 export type Scope = 'project' | 'user';
