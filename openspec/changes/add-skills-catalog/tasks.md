@@ -56,12 +56,12 @@ Base branches (stacked-to-main): each PR targets `main` after the previous merge
 
 ## Slice 2: Write side, skillsDir, planning, manifest
 
-- [ ] 2.1 `file-system.ts` plus `node-fs.ts`: `writeBytes`, `exists`, `removeDir`; tests: tmp+rename, non-empty returns false, missing returns false
-- [ ] 2.2 `src/ports/agent-target.ts`, `src/adapters/claude-code/target.ts`: `skillsDir`; tests in `target.test.ts` (user/project scope)
-- [ ] 2.3 `src/domain/manifest.ts`: Item discriminated union, `afterHash: string|null`, `createdDirs` default `[]`, `deriveSkillOwnership`; tests: old manifest parses, skill item, null hash
-- [ ] 2.4 Make `undo-install.ts` compile with nullable hash (minimal, mcp behavior unchanged); existing tests green
-- [ ] 2.5 `src/domain/plan/skill-plan.ts` plus `change-plan.ts`: `classifySkill`, `ChangePlan.skills`; tests: create, skip, update, owned-modified conflict, unowned conflict, force update, removed files listed
-- [ ] 2.6 `src/application/init-mcps.ts` planInit: skills via `skillsDir`, unknown skill error, target symlink fails (exit 1 even with `--force`); tests with in-memory FS
+- [x] 2.1 `file-system.ts` plus `node-fs.ts`: `writeBytes`, `exists`, `removeDir`; tests: tmp+rename, non-empty returns false, missing returns false
+- [x] 2.2 `src/ports/agent-target.ts`, `src/adapters/claude-code/target.ts`: `skillsDir`; tests in `target.test.ts` (user/project scope)
+- [x] 2.3 `src/domain/manifest.ts`: Item discriminated union, `afterHash: string|null`, `createdDirs` default `[]`, `deriveSkillOwnership`; tests: old manifest parses, skill item, null hash
+- [x] 2.4 Make `undo-install.ts` compile with nullable hash (minimal, mcp behavior unchanged); existing tests green
+- [x] 2.5 `src/domain/plan/skill-plan.ts` plus `change-plan.ts`: `classifySkill`, `ChangePlan.skills`; tests: create, skip, update, owned-modified conflict, unowned conflict, force update, removed files listed
+- [x] 2.6 `src/application/init-mcps.ts` planInit: skills via `skillsDir`, unknown skill error, target symlink fails (exit 1 even with `--force`); tests with in-memory FS
 
 ## Slice 3: Apply and undo
 
