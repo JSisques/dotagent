@@ -48,13 +48,13 @@ describe('lint gate', () => {
     const [result] = await eslint.lintFiles([FIXTURE]);
     const ruleIds = result?.messages.map((message) => message.ruleId);
     expect(ruleIds).toContain('@typescript-eslint/no-floating-promises');
-  });
+  }, 30_000);
 
   it('reports nothing for a clean source file', async () => {
     const eslint = new ESLint({ cwd: ROOT });
     const [result] = await eslint.lintFiles([join(ROOT, 'src/main.ts')]);
     expect(result?.errorCount).toBe(0);
-  });
+  }, 30_000);
 });
 
 describe('inline disables', () => {

@@ -90,6 +90,9 @@ shitaku init --mcps github --scope user --dry-run
 
 # Restore the files changed by the last install
 shitaku undo [--id <id>] [--force] [--dry-run]
+
+# Report what shitaku installed and whether it changed (read-only)
+shitaku status [--scope project|user] [--source <folder>] [--json]
 ```
 
 Scopes: `project` writes MCPs to `./.mcp.json` and skills to `./.claude/skills/`; `user` writes MCPs to `~/.claude.json` and skills to `~/.claude/skills/` (close Claude Code first when writing `~/.claude.json`).
@@ -116,7 +119,39 @@ Safety:
 
 Before downgrading shitaku to a version without skills support, run `shitaku undo` for any install that included skills: older versions do not understand skill entries in the manifest.
 
-Limits: skills are copied as plain files, so shitaku does not run, lint or sandbox them. There is no `list` command or profile selection on the CLI yet.
+Limits: skills are copied as plain files, so shitaku does not run, lint or sandbox them. There is no profile selection on the CLI yet.
+
+### Status
+
+`shitaku status` lists every item shitaku installed and has not undone, in both scopes unless `--scope` is given, and never writes anything. The text output is grouped by scope, then by kind (`mcps`, `skills`), and each item shows its name, state and path:
+
+```
+target: claude-code
+project scope:
+  mcps:
+    github: installed  /work/app/.mcp.json
+  skills:
+    example-skill: modified  /work/app/.claude/skills/example-skill
+```
+
+In `--json` every item carries `kind` instead. For an MCP only its own entry is compared, so other changes to `~/.claude.json` do not matter.
+
+| State                  | Meaning                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `installed`            | on disk, as installed, and equal to the catalog                                      |
+| `modified`             | differs from what was installed; also an unreadable config file or a skill symlink   |
+| `out-of-date`          | untouched, but the catalog has a newer version                                       |
+| `missing`              | the MCP entry or skill directory is gone                                             |
+| `missing-from-catalog` | no longer offered by the catalog                                                     |
+| `unknown`              | the catalog failed to load, so `installed`, `out-of-date` and removal cannot be told |
+
+`modified` wins over `out-of-date`, and `missing` wins over everything. When the catalog cannot be loaded, the header says `catalog unavailable` and local drift (`missing`, `modified`) is still reported.
+
+`--json` prints one document, `{ "version": 1, "target", "catalog": "available" | "unavailable", "items": [{ "scope", "kind", "name", "state", "path", "installId" }] }`. Later changes to its shape are additive. Catalog warnings go to stderr, so stdout is always valid JSON.
+
+`status` exits `0` whenever it runs, even when items drifted, so check the states (or the JSON) rather than the exit code. A corrupt manifest prints an `error:` and exits `1`; the same now holds for `init` and `undo`.
+
+Limitation: `status` compares against the bundled catalog unless you pass `--source`. An item installed with `init --source ./mine` shows as `missing-from-catalog` (or `out-of-date`) unless you run `status --source ./mine`.
 
 ### Custom catalogs and trust
 

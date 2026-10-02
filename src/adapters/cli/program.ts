@@ -8,8 +8,10 @@ import {
   UnknownSkillError,
 } from '@/application/init-mcps.js';
 import type { InitDeps } from '@/application/init-mcps.js';
+import { getStatus, type StatusReport } from '@/application/status.js';
 import { undoInstall, UndoSelectionError, UndoVerifyError } from '@/application/undo-install.js';
 import { ConfigError } from '@/domain/json-merge.js';
+import { ManifestError } from '@/domain/manifest.js';
 import type { ChangePlan } from '@/domain/plan/change-plan.js';
 import type { AgentTarget, Scope } from '@/ports/agent-target.js';
 import type { CatalogSource } from '@/ports/catalog-source.js';
@@ -44,6 +46,9 @@ interface InitOptions {
 
 /** Exit codes: 0 ok, 1 error, 2 unresolved conflicts, 3 undo refused. */
 const EXIT_CONFLICT = 2;
+
+/** Version of the `status --json` document; later changes to its shape must be additive. */
+const STATUS_JSON_VERSION = 1;
 
 function printPlan(deps: CliDeps, plan: ChangePlan): void {
   const row = (name: string, action: string, reason?: string): string =>
@@ -170,6 +175,36 @@ async function runUndo(deps: CliDeps, opts: { id?: string; force?: boolean; dryR
   return result.exitCode;
 }
 
+function printStatus(deps: CliDeps, report: StatusReport): void {
+  deps.out(`target: ${report.target}`);
+  if (report.catalog === 'unavailable') deps.out('catalog unavailable');
+  if (report.items.length === 0) deps.out('no managed items');
+  let scope: string | undefined;
+  let kind: string | undefined;
+  for (const item of report.items) {
+    if (item.scope !== scope) {
+      deps.out(`${(scope = item.scope)} scope:`);
+      kind = undefined;
+    }
+    if (item.kind !== kind) deps.out(`  ${(kind = item.kind)}s:`);
+    deps.out(`    ${item.name}: ${item.state}  ${item.path}`);
+  }
+}
+
+async function runStatus(deps: CliDeps, opts: { scope?: Scope; source?: string; json?: boolean }): Promise<number> {
+  const report = await getStatus(
+    { source: deps.makeSource(opts.source), fs: deps.fs, target: deps.target, paths: deps.paths },
+    { scope: opts.scope },
+  );
+  // Catalog problems go to stderr in both modes so `--json` keeps stdout parseable.
+  for (const issue of report.issues) deps.err(`warning: skipped ${issue.file}: ${issue.reason}`);
+  if (opts.json) {
+    const { target, catalog, items } = report;
+    deps.out(JSON.stringify({ version: STATUS_JSON_VERSION, target, catalog, items }, null, 2));
+  } else printStatus(deps, report);
+  return 0;
+}
+
 const csv = (value: string): string[] =>
   value
     .split(',')
@@ -208,6 +243,17 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
         void (exitCode = await guarded(deps, () => runUndo(deps, opts))),
     );
 
+  program
+    .command('status')
+    .description('List the items shitaku installed and whether they changed')
+    .addOption(new Option('--scope <scope>', 'only report this scope (default: both)').choices(['project', 'user']))
+    .option('--source <folder>', 'compare against a catalog folder instead of the bundled one')
+    .option('--json', 'print one versioned JSON document')
+    .action(
+      async (opts: { scope?: Scope; source?: string; json?: boolean }) =>
+        void (exitCode = await guarded(deps, () => runStatus(deps, opts))),
+    );
+
   try {
     await program.parseAsync(argv);
   } catch (e) {
@@ -229,6 +275,7 @@ async function guarded(deps: CliDeps, run: () => Promise<number>): Promise<numbe
       StaleFileError,
       LeakError,
       ConfigError,
+      ManifestError,
       UndoSelectionError,
       UndoVerifyError,
       PromptCancelled,
