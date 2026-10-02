@@ -9,17 +9,18 @@ Defines how source and test modules reference each other (import aliases), the g
 ### Requirement: Alias Contract
 
 The project MUST define two import aliases: `@/*` resolving to `src/*` and `@test/*` resolving to `test/*`. Alias specifiers MUST keep the `.js` suffix (for example `@/domain/x.js`). The aliases MUST be configured consistently in `tsconfig.json` `paths` (inherited by `tsconfig.build.json`), in the build rewriting step, and in Vitest `resolve.alias`.
+(Previously: scenarios used `npm run typecheck` and `npx vitest run`)
 
 #### Scenario: Typecheck resolves aliases
 
 - GIVEN a module in `src` or `test` imports `@/domain/x.js`
-- WHEN `npm run typecheck` runs
+- WHEN `pnpm run typecheck` runs
 - THEN the import resolves to `src/domain/x.ts` and no resolution error is reported
 
 #### Scenario: Tests resolve both aliases
 
 - GIVEN a test imports `@/application/y.js` and `@test/helpers/z.js`
-- WHEN `npx vitest run` runs
+- WHEN `pnpm exec vitest run` runs
 - THEN both imports resolve to `src/application/y.ts` and `test/helpers/z.ts` and the test executes
 
 ### Requirement: Parent-Relative Imports Removed
@@ -62,8 +63,8 @@ The `build` script MUST rewrite alias specifiers in emitted JavaScript after `ts
 
 ### Requirement: Packed-Install Smoke Test
 
-A smoke script MUST run `npm pack`, install the resulting tarball in a temporary directory, and run `shitaku --help` and `node dist/main.js --help`, both of which MUST exit with code 0. The smoke script MUST be part of `prepublishOnly`.
-(Previously: the bin was invoked as `dotagent-cli --help`)
+A smoke script MUST run `npm pack`, install the resulting tarball in a temporary directory, and run `shitaku --help` and `node dist/main.js --help`, both of which MUST exit with code 0. The script MUST keep using npm (it simulates a consumer install). The smoke script MUST be part of `prepublishOnly`, which MUST invoke scripts via `pnpm run`.
+(Previously: the bin was invoked as `dotagent-cli --help`, and `prepublishOnly` used npm)
 
 #### Scenario: Packed package runs
 
@@ -108,21 +109,23 @@ A smoke script MUST run `npm pack`, install the resulting tarball in a temporary
 ### Requirement: No Behavior Change
 
 The change MUST NOT alter runtime behavior, package `exports`, or bundling. The existing `typecheck`, `build`, and test suites MUST pass unchanged apart from import specifiers.
+(Previously: pipeline commands were npm-based)
 
 #### Scenario: Full pipeline green
 
 - GIVEN the alias wiring and codemod are applied
-- WHEN `npm run typecheck`, `npm run build`, and `npx vitest run` run
+- WHEN `pnpm run typecheck`, `pnpm run build`, and `pnpm exec vitest run` run
 - THEN all succeed
 
 ### Requirement: Package Identity
 
-`package.json` MUST declare `name` as `@jsisques/shitaku`, a `bin` entry named `shitaku` (and no `dotagent-cli` entry), and `repository` pointing to `https://github.com/JSisques/shitaku`. `package-lock.json` MUST be consistent with these values.
+`package.json` MUST declare `name` as `@jsisques/shitaku`, a `bin` entry named `shitaku` (and no `dotagent-cli` entry), and `repository` pointing to `https://github.com/JSisques/shitaku`. `pnpm-lock.yaml` MUST be consistent with these values.
+(Previously: `package-lock.json` MUST be consistent with these values)
 
 #### Scenario: Metadata renamed
 
 - GIVEN the repository root
-- WHEN `package.json` and `package-lock.json` are read
+- WHEN `package.json` and `pnpm-lock.yaml` are read
 - THEN the name is `@jsisques/shitaku`, `bin` exposes only `shitaku`, and `repository` is the shitaku URL
 
 #### Scenario: No legacy name in live files

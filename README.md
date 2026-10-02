@@ -37,22 +37,26 @@ Whether `${VAR}` placeholders are expanded in user-scope `~/.claude.json` entrie
 ## Development
 
 ```sh
-npm install
-npm run typecheck
-npm test
-npm run build
-npm run format        # rewrite files with Prettier
-npm run format:check  # fail if any file is not formatted
+pnpm install
+pnpm run typecheck
+pnpm test
+pnpm run build
+pnpm run format        # rewrite files with Prettier
+pnpm run format:check  # fail if any file is not formatted
 ```
+
+This project uses pnpm, pinned through the `packageManager` field. Run `corepack enable` once so the pinned version is used automatically (Node 25+ no longer bundles Corepack: run `npm i -g corepack` first). Without Corepack, `npm i -g pnpm@10` also works. If a global pnpm is already installed, skip Corepack (or remove the global pnpm first), because installing Corepack globally can conflict with its binary. `npm install` is not supported for development.
 
 Tests never touch the real home directory; see `test/setup.ts`.
 
-Contributors need Node `>=22.22.1` (`nvm use` reads `.nvmrc`). Git hooks are installed by `npm install` (via Husky):
+Contributors need Node `>=22.22.1` (`nvm use` reads `.nvmrc`). Git hooks are installed by `pnpm install` (via Husky):
 
-| Hook         | Runs                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------- |
-| `pre-commit` | Prettier on staged files (lint-staged)                                                              |
-| `commit-msg` | commitlint with Conventional Commits                                                                |
-| `pre-push`   | `npm run typecheck`, `npm run test:changed` (only tests affected vs `origin/main`), `npm run build` |
+| Hook         | Runs                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| `pre-commit` | Prettier on staged files (lint-staged)                                                                 |
+| `commit-msg` | commitlint with Conventional Commits                                                                   |
+| `pre-push`   | `pnpm run typecheck`, `pnpm run test:changed` (only tests affected vs `origin/main`), `pnpm run build` |
 
 Bypass hooks with `git commit --no-verify`, `git push --no-verify`, or `HUSKY=0`.
+
+Exception: `pnpm run smoke:pack` (`scripts/smoke-pack.mjs`) intentionally keeps using `npm pack` and `npm install`, because it simulates how consumers install the published package.

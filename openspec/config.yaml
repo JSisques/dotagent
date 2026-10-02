@@ -11,19 +11,19 @@ context: |
   Artifacts language: English.
 strict_tdd: true
 strict_tdd_note: >
-  Workspace-level test command exists: "npm test" (vitest run).
+  Workspace-level test command exists: "pnpm test" (vitest run).
 projects: []
 testing:
   runner: vitest
-  command: npm test
+  command: pnpm test
   layers:
     unit: true
     integration: false
     e2e: false
   coverage: false
   linter: null
-  type_checker: npm run typecheck
-  formatter: npm run format:check
+  type_checker: pnpm run typecheck
+  formatter: pnpm run format:check
 rules:
   proposal:
     - Include rollback plan and affected hexagonal layers
@@ -36,6 +36,6 @@ rules:
   apply:
     - Follow hexagonal boundaries; write tests first (strict TDD)
   verify:
-    - Run npm test, npm run typecheck and npm run format:check
+    - Run pnpm test, pnpm run typecheck and pnpm run format:check
   archive:
     - Merge delta specs into openspec/specs before archiving
