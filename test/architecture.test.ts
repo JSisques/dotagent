@@ -67,6 +67,6 @@ describe('test isolation', () => {
   });
 
   it('points HOME at a temp dir', () => {
-    expect(process.env['HOME']).toContain('dotagent-home-');
+    expect(process.env['HOME']).toContain('shitaku-home-');
   });
 });

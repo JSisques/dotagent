@@ -11,7 +11,7 @@ export interface TmpPaths {
 
 /** Creates an isolated temp root with injected `homeDir` and `cwd` directories. */
 export async function makeTmpPaths(): Promise<TmpPaths> {
-  const root = await mkdtemp(join(tmpdir(), 'dotagent-test-'));
+  const root = await mkdtemp(join(tmpdir(), 'shitaku-test-'));
   const { mkdir } = await import('node:fs/promises');
   const homeDir = join(root, 'home');
   const cwd = join(root, 'cwd');

@@ -22,7 +22,7 @@ export class NodeFileSystem implements FileSystem {
       (s) => s.mode & 0o777,
       () => 0o644,
     );
-    const tmp = join(dir, `.${basename(path)}.dotagent-${randomBytes(4).toString('hex')}.tmp`);
+    const tmp = join(dir, `.${basename(path)}.shitaku-${randomBytes(4).toString('hex')}.tmp`);
     try {
       const handle = await open(tmp, 'w', mode);
       try {

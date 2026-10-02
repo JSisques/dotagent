@@ -12,7 +12,7 @@ const ItemSchema = z.object({
 const FileSchema = z.object({
   path: z.string(),
   scope: z.enum(['project', 'user']),
-  /** Path relative to the dotagent state directory; null when the file did not exist before the install. */
+  /** Path relative to the shitaku state directory; null when the file did not exist before the install. */
   backup: z.string().nullable(),
   beforeHash: z.string().nullable(),
   afterHash: z.string(),
@@ -47,7 +47,7 @@ export function parseManifest(text: string): Manifest {
   return parsed.data;
 }
 
-/** file path -> entry name -> hash of the entry dotagent last wrote. Undone installs do not count. */
+/** file path -> entry name -> hash of the entry shitaku last wrote. Undone installs do not count. */
 export type Ownership = Record<string, Record<string, string>>;
 
 /** Replays the non-undone installs in order, so a later install replaces an earlier hash. */

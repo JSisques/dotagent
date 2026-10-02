@@ -1,10 +1,14 @@
 {
-  "name": "@jsisques/dotagent",
+  "name": "@jsisques/shitaku",
   "version": "0.0.0",
   "description": "Portable, configurable AI agent setup (skills, MCPs, etc.) installable via npx.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JSisques/shitaku"
+  },
   "bin": {
-    "dotagent-cli": "./dist/main.js"
+    "shitaku": "./dist/main.js"
   },
   "files": [
     "dist",

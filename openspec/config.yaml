@@ -1,6 +1,6 @@
 schema: spec-driven
 context: |
-  Project: dotagent (planned npm package @jsisques/dotagent).
+  Project: shitaku (planned npm package @jsisques/shitaku).
   Status: greenfield; only README.md exists. No package.json yet.
   Planned stack: Node LTS, TypeScript (ESM), Vitest.
   Architecture: hexagonal (ports and adapters).

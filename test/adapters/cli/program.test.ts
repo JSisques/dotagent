@@ -53,7 +53,7 @@ describe('runCli', () => {
       out: (l) => out.push(l),
       err: (l) => err.push(l),
     };
-    return runCli(['node', 'dotagent-cli', ...args], deps);
+    return runCli(['node', 'shitaku', ...args], deps);
   };
   const usePrompter = (script?: Parameters<typeof fakePrompter>[0]) => ({ prompter, calls } = fakePrompter(script));
 
@@ -168,7 +168,7 @@ describe('runCli', () => {
       await run('init', '--mcps', 'github', '--scope', 'project', '--dry-run');
       await run('undo', '--dry-run');
       expect(text()).not.toContain(TOKEN);
-      const files = [join(tmp.homeDir, '.claude.json'), join(tmp.homeDir, '.claude', '.dotagent', 'manifest.json')];
+      const files = [join(tmp.homeDir, '.claude.json'), join(tmp.homeDir, '.claude', '.shitaku', 'manifest.json')];
       for (const f of files) expect(await readFile(f, 'utf8')).not.toContain(TOKEN);
     });
   });

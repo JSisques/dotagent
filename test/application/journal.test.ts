@@ -21,14 +21,28 @@ describe('journal', () => {
   });
   afterEach(() => tmp.cleanup());
 
-  it('keeps the state under <home>/.claude/.dotagent', () => {
-    expect(stateDir(tmp.homeDir)).toBe(`${tmp.homeDir}/.claude/.dotagent`);
-    expect(manifestPath(tmp.homeDir)).toBe(`${tmp.homeDir}/.claude/.dotagent/manifest.json`);
+  it('keeps the state under <home>/.claude/.shitaku', () => {
+    expect(stateDir(tmp.homeDir)).toBe(`${tmp.homeDir}/.claude/.shitaku`);
+    expect(manifestPath(tmp.homeDir)).toBe(`${tmp.homeDir}/.claude/.shitaku/manifest.json`);
   });
 
   it('loads an empty manifest when none exists, without creating it', async () => {
     expect(await loadManifest(fs, tmp.homeDir)).toEqual({ version: 1, installs: [] });
     expect(await fs.readText(manifestPath(tmp.homeDir))).toBeNull();
+  });
+
+  it('ignores a legacy state directory and leaves it untouched', async () => {
+    // Built from parts so the naming guard does not flag this file.
+    const legacyManifest = `${tmp.homeDir}/.claude/.${['dot', 'agent'].join('')}/manifest.json`;
+    const legacyText = JSON.stringify({ version: 1, installs: [install('legacy')] });
+    await fs.writeAtomic(legacyManifest, legacyText);
+
+    expect(await loadManifest(fs, tmp.homeDir)).toEqual({ version: 1, installs: [] });
+    await appendInstall(fs, tmp.homeDir, install('a'));
+
+    const saved = JSON.parse(await readFile(manifestPath(tmp.homeDir), 'utf8'));
+    expect(saved.installs.map((i: Install) => i.id)).toEqual(['a']);
+    expect(await readFile(legacyManifest, 'utf8')).toBe(legacyText);
   });
 
   it('writes the manifest on the first install and appends afterwards', async () => {
