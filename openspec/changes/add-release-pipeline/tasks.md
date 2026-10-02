@@ -34,24 +34,24 @@ The lockfile is generated and excluded from the count. Code alone (~300) is Medi
 
 ## Phase 2: Slice 2 - RED contract tests
 
-- [ ] 2.1 RED: `cd.yml` text: `workflow_dispatch`, `dry_run`, `refs/heads/main`, `needs: ci`, `npm@11`, `HUSKY`, `fetch-depth: 0`, `persist-credentials: false`, `cancel-in-progress: false`, `id-token: write` once, no `push:`, no `NPM_TOKEN`, no `registry-url`
-- [ ] 2.2 RED: `.releaserc.json` plugin order (npm < exec < github; changelog, npm < git), `[skip ci]` message, assets `CHANGELOG.md`+`package.json`, no `releaseRules`
-- [ ] 2.3 RED: `package.json` has no `publishConfig.registry`; `.github/github-packages.npmrc` exists with `${GITHUB_TOKEN}`
-- [ ] 2.4 RED: `docs/releasing.md` mentions `0.1.0`, `v0.1.0`, trusted publisher, `cd.yml` rename warning; `README.md` links it
+- [x] 2.1 RED: `cd.yml` text: `workflow_dispatch`, `dry_run`, `refs/heads/main`, `needs: ci`, `npm@11`, `HUSKY`, `fetch-depth: 0`, `persist-credentials: false`, `cancel-in-progress: false`, `id-token: write` once, no `push:`, no `NPM_TOKEN`, no `registry-url`
+- [x] 2.2 RED: `.releaserc.json` plugin order (npm < exec < github; changelog, npm < git), `[skip ci]` message, assets `CHANGELOG.md`+`package.json`, no `releaseRules`
+- [x] 2.3 RED: `package.json` has no `publishConfig.registry`; `.github/github-packages.npmrc` exists with `${GITHUB_TOKEN}`
+- [x] 2.4 RED: `docs/releasing.md` mentions `0.1.0`, `v0.1.0`, trusted publisher, `cd.yml` rename warning; `README.md` links it
 
 ## Phase 3: Slice 2 - Implementation
 
-- [ ] 3.1 `pnpm add -D semantic-release@^25 @semantic-release/changelog @semantic-release/git @semantic-release/exec conventional-changelog-conventionalcommits`
-- [ ] 3.2 Create `.releaserc.json` per design
-- [ ] 3.3 Create `.github/github-packages.npmrc`
-- [ ] 3.4 Create `.github/workflows/cd.yml` per design
-- [ ] 3.5 Create `docs/releasing.md` (bootstrap runbook, failure recovery, dry-run); add "Releasing" pointer to `README.md`
+- [x] 3.1 `pnpm add -D semantic-release@^25 @semantic-release/changelog @semantic-release/git @semantic-release/exec conventional-changelog-conventionalcommits`
+- [x] 3.2 Create `.releaserc.json` per design
+- [x] 3.3 Create `.github/github-packages.npmrc`
+- [x] 3.4 Create `.github/workflows/cd.yml` per design
+- [x] 3.5 Create `docs/releasing.md` (bootstrap runbook, failure recovery, dry-run); add "Releasing" pointer to `README.md`
 
 ## Phase 4: Validation (automatable)
 
-- [ ] 4.1 `actionlint` on `ci.yml` and `cd.yml`
-- [ ] 4.2 `pnpm run lint`, `format:check`, `typecheck`, `test`, `build` all exit 0
-- [ ] 4.3 Scratch clone, tag `v0.1.0`: `feat` -> 0.2.0, `fix` -> 0.1.1, `feat!:` and `BREAKING CHANGE:` footer -> 1.0.0 (config limited to commit-analyzer + notes, same preset)
+- [x] 4.1 `actionlint` on `ci.yml` and `cd.yml`
+- [x] 4.2 `pnpm run lint`, `format:check`, `typecheck`, `test`, `build` all exit 0
+- [x] 4.3 Scratch clone, tag `v0.1.0`: `feat` -> 0.2.0, `fix` -> 0.1.1, `feat!:` and `BREAKING CHANGE:` footer -> 1.0.0 (config limited to commit-analyzer + notes, same preset)
 
 ## Phase 5: Manual maintainer tasks (NOT automatable, not for sdd-apply)
 
