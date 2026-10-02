@@ -64,7 +64,7 @@ The `build` script MUST rewrite alias specifiers in emitted JavaScript after `ts
 ### Requirement: Packed-Install Smoke Test
 
 A smoke script MUST run `npm pack`, install the resulting tarball in a temporary directory, and run `shitaku --help` and `node dist/main.js --help`, both of which MUST exit with code 0. The script MUST keep using npm (it simulates a consumer install). The smoke script MUST be part of `prepublishOnly`, which MUST invoke scripts via `pnpm run`.
-(Previously: `prepublishOnly` used npm)
+(Previously: the bin was invoked as `dotagent-cli --help`, and `prepublishOnly` used npm)
 
 #### Scenario: Packed package runs
 
@@ -120,7 +120,7 @@ The change MUST NOT alter runtime behavior, package `exports`, or bundling. The 
 ### Requirement: Package Identity
 
 `package.json` MUST declare `name` as `@jsisques/shitaku`, a `bin` entry named `shitaku` (and no `dotagent-cli` entry), and `repository` pointing to `https://github.com/JSisques/shitaku`. `pnpm-lock.yaml` MUST be consistent with these values.
-(Reason: Archive of migration to pnpm)
+(Previously: `package-lock.json` MUST be consistent with these values)
 
 #### Scenario: Metadata renamed
 
