@@ -34,7 +34,9 @@
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run smoke:pack",
     "prepare": "husky || true",
     "test:changed": "vitest run --changed origin/main --passWithNoTests",
-    "smoke:pack": "node scripts/smoke-pack.mjs"
+    "smoke:pack": "node scripts/smoke-pack.mjs",
+    "docs:catalog": "node scripts/generate-catalog-table.mjs",
+    "docs:catalog:check": "node scripts/generate-catalog-table.mjs --check"
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",

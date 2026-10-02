@@ -50,6 +50,8 @@ catalog/
 
 Every item must be listed in `catalog/catalog.json` under `items.mcps`, `items.profiles` or `items.skills`. The loader (`src/adapters/catalog/folder-source.ts`) validates items with the zod schemas in `src/domain/catalog/`. An invalid or unlisted item is skipped with a warning.
 
+After adding or changing an MCP or skill, run `pnpm run docs:catalog` to regenerate the catalog tables in `README.md`. CI fails (`pnpm run docs:catalog:check`) when they are out of date.
+
 Names for MCPs and skills must match `^[a-z0-9][a-z0-9-]*$` (lowercase letters, digits and hyphens; no leading hyphen).
 
 ### Add a skill
