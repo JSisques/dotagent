@@ -11,8 +11,11 @@ export async function loadManifest(fs: FileSystem, homeDir: string): Promise<Man
   return text === null ? emptyManifest() : parseManifest(text);
 }
 
+export async function saveManifest(fs: FileSystem, homeDir: string, manifest: Manifest): Promise<void> {
+  await fs.writeAtomic(manifestPath(homeDir), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 export async function appendInstall(fs: FileSystem, homeDir: string, install: Install): Promise<void> {
   const manifest = await loadManifest(fs, homeDir);
-  const next: Manifest = { ...manifest, installs: [...manifest.installs, install] };
-  await fs.writeAtomic(manifestPath(homeDir), `${JSON.stringify(next, null, 2)}\n`);
+  await saveManifest(fs, homeDir, { ...manifest, installs: [...manifest.installs, install] });
 }
