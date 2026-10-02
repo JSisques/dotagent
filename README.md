@@ -39,6 +39,7 @@ Whether `${VAR}` placeholders are expanded in user-scope `~/.claude.json` entrie
 ```sh
 pnpm install
 pnpm run typecheck
+pnpm run lint          # ESLint (typescript-eslint, type-aware); `lint:fix` applies autofixes
 pnpm test
 pnpm run build
 pnpm run format        # rewrite files with Prettier
@@ -53,7 +54,7 @@ Contributors need Node `>=22.22.1` (`nvm use` reads `.nvmrc`). Git hooks are ins
 
 | Hook         | Runs                                                                                                   |
 | ------------ | ------------------------------------------------------------------------------------------------------ |
-| `pre-commit` | Prettier on staged files (lint-staged)                                                                 |
+| `pre-commit` | ESLint then Prettier on staged `ts`/`mjs`/`js` files, Prettier on the rest (lint-staged)               |
 | `commit-msg` | commitlint with Conventional Commits                                                                   |
 | `pre-push`   | `pnpm run typecheck`, `pnpm run test:changed` (only tests affected vs `origin/main`), `pnpm run build` |
 

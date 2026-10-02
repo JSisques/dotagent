@@ -16,7 +16,8 @@ import {
 } from '@/application/init-mcps.js';
 import { appendInstall, manifestPath, stateDir } from '@/application/journal.js';
 import { hashEntry, sha256 } from '@/domain/hash.js';
-import type { Manifest } from '@/domain/manifest.js';
+import { parseManifest, type Manifest } from '@/domain/manifest.js';
+import { parseDoc } from '@test/helpers/parse-doc.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 const CATALOG = join(import.meta.dirname, '..', '..', 'catalog');
@@ -41,7 +42,7 @@ describe('initMcps (project scope)', () => {
     const { applied } = await initMcps(deps, { mcps: ['github'], scope: 'project' });
     expect(applied).toBe(true);
     const text = await readFile(mcpFile(), 'utf8');
-    expect(JSON.parse(text).mcpServers.github.headers.Authorization).toBe('Bearer ${GITHUB_TOKEN}');
+    expect(parseDoc(text).mcpServers.github?.headers?.Authorization).toBe('Bearer ${GITHUB_TOKEN}');
     expect(text).not.toContain('abc123');
     expect(await readdir(tmp.homeDir)).toEqual(['.claude']);
   });
@@ -52,7 +53,7 @@ describe('initMcps (project scope)', () => {
       JSON.stringify({ theme: 'dark', mcpServers: { other: { type: 'stdio', command: 'x' } } }),
     );
     await initMcps(deps, { mcps: ['context7'], scope: 'project' });
-    const doc = JSON.parse(await readFile(mcpFile(), 'utf8'));
+    const doc = parseDoc(await readFile(mcpFile(), 'utf8'));
     expect(doc.theme).toBe('dark');
     expect(Object.keys(doc.mcpServers)).toEqual(['other', 'context7']);
   });
@@ -81,7 +82,7 @@ describe('initMcps (project scope)', () => {
     expect(await readFile(mcpFile(), 'utf8')).toBe(original);
     const forced = await initMcps(deps, { mcps: ['github'], scope: 'project', force: true });
     expect(forced.applied).toBe(true);
-    expect(JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers.github.type).toBe('http');
+    expect(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers.github?.type).toBe('http');
   });
 
   it('rejects an unknown MCP naming it, writing nothing', async () => {
@@ -101,7 +102,7 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
   let tmp: TmpPaths;
   let deps: InitDeps;
   const mcpFile = () => join(tmp.cwd, '.mcp.json');
-  const manifest = async (): Promise<Manifest> => JSON.parse(await readFile(manifestPath(tmp.homeDir), 'utf8'));
+  const manifest = async (): Promise<Manifest> => parseManifest(await readFile(manifestPath(tmp.homeDir), 'utf8'));
   beforeEach(async () => {
     tmp = await makeTmpPaths();
     deps = {
@@ -127,6 +128,7 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
       afterHash: sha256(await readFile(mcpFile(), 'utf8')),
     });
     expect(file.items).toEqual([
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest asymmetric matchers are typed any
       { kind: 'mcp', name: 'github', action: 'create', entryHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
     ]);
   });
@@ -141,7 +143,7 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
     const plan = await planInit(deps, { mcps: ['github'], scope: 'project' });
     await writeFile(mcpFile(), JSON.stringify({ theme: 'dark', fresh: 1 }));
     await applyPlan(deps, plan);
-    const doc = JSON.parse(await readFile(mcpFile(), 'utf8'));
+    const doc = parseDoc(await readFile(mcpFile(), 'utf8'));
     expect(doc).toMatchObject({ theme: 'dark', fresh: 1, mcpServers: { github: { type: 'http' } } });
   });
 
@@ -217,21 +219,21 @@ describe('initMcps (user scope)', () => {
     );
     await writeFile(userFile(), original);
     await initMcps(deps, { mcps: ['github'], scope: 'user' });
-    const doc = JSON.parse(await readFile(userFile(), 'utf8'));
+    const doc = parseDoc(await readFile(userFile(), 'utf8'));
     expect(doc).toMatchObject({
       projects: { a: 1 },
       theme: 'dark',
       mcpServers: { other: { command: 'x' }, github: { type: 'http' } },
     });
-    const manifest = JSON.parse(await readFile(manifestPath(tmp.homeDir), 'utf8'));
-    const file = manifest.installs[0].files[0];
+    const manifest = parseManifest(await readFile(manifestPath(tmp.homeDir), 'utf8'));
+    const file = manifest.installs[0]!.files[0]!;
     expect(file.scope).toBe('user');
-    expect(await readFile(join(stateDir(tmp.homeDir), file.backup), 'utf8')).toBe(original);
+    expect(await readFile(join(stateDir(tmp.homeDir), file.backup!), 'utf8')).toBe(original);
   });
 
   it('creates a missing ~/.claude.json containing only mcpServers', async () => {
     await initMcps(deps, { mcps: ['context7'], scope: 'user' });
-    expect(Object.keys(JSON.parse(await readFile(userFile(), 'utf8')))).toEqual(['mcpServers']);
+    expect(Object.keys(parseDoc(await readFile(userFile(), 'utf8')))).toEqual(['mcpServers']);
   });
 
   it('aborts on a corrupt ~/.claude.json leaving it byte-identical and the manifest absent', async () => {

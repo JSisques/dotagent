@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sha256 } from '@/domain/hash.js';
 import { ConfigError, detectIndent, mergeAtPath, readAtPath } from '@/domain/json-merge.js';
+import { parseDoc } from '@test/helpers/parse-doc.js';
 
 const KEY = ['mcpServers'];
 
@@ -15,7 +16,7 @@ describe('json-merge', () => {
     const before =
       JSON.stringify({ theme: 'dark', mcpServers: { other: { a: { b: 1 } } }, projects: { x: [1] } }, null, 2) + '\n';
     const out = mergeAtPath(before, KEY, { github: { type: 'http' } });
-    const doc = JSON.parse(out);
+    const doc = parseDoc(out);
     expect(doc.theme).toBe('dark');
     expect(doc.projects).toEqual({ x: [1] });
     expect(Object.keys(doc)).toEqual(['theme', 'mcpServers', 'projects']);

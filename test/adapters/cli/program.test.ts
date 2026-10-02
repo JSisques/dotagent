@@ -6,6 +6,7 @@ import { runCli, type CliDeps } from '@/adapters/cli/program.js';
 import { claudeCodeTarget } from '@/adapters/claude-code/target.js';
 import { NodeFileSystem } from '@/adapters/fs/node-fs.js';
 import { PromptCancelled, type Prompter } from '@/ports/prompter.js';
+import { parseDoc } from '@test/helpers/parse-doc.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 const CATALOG = join(import.meta.dirname, '..', '..', '..', 'catalog');
@@ -20,13 +21,19 @@ function fakePrompter(
     throw new Error(`unexpected prompt: ${name}`);
   };
   const prompter: Prompter = {
-    selectMcps: async () => (calls.push('mcps'), (script.mcps as string[] | undefined) ?? unscripted('mcps')),
-    selectScope: async () => (
-      calls.push('scope'),
-      (script.scope as 'project' | 'user' | undefined) ?? unscripted('scope')
+    selectMcps: () => (
+      calls.push('mcps'),
+      Promise.resolve((script.mcps as string[] | undefined) ?? unscripted('mcps'))
     ),
-    resolveConflict: async () => (calls.push('conflict'), script.conflict ?? unscripted('conflict')),
-    confirm: async () => (calls.push('confirm'), (script.confirm as boolean | undefined) ?? unscripted('confirm')),
+    selectScope: () => (
+      calls.push('scope'),
+      Promise.resolve((script.scope as 'project' | 'user' | undefined) ?? unscripted('scope'))
+    ),
+    resolveConflict: () => (calls.push('conflict'), Promise.resolve(script.conflict ?? unscripted('conflict'))),
+    confirm: () => (
+      calls.push('confirm'),
+      Promise.resolve((script.confirm as boolean | undefined) ?? unscripted('confirm'))
+    ),
     info: () => {},
   };
   return { prompter, calls };
@@ -74,7 +81,7 @@ describe('runCli', () => {
 
   it('installs without prompting when --mcps and --scope are given', async () => {
     expect(await run('init', '--mcps', 'github', '--scope', 'project')).toBe(0);
-    expect(JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers.github.type).toBe('http');
+    expect(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers.github?.type).toBe('http');
     expect(calls).toEqual([]);
   });
 
@@ -82,7 +89,7 @@ describe('runCli', () => {
     usePrompter({ mcps: ['context7'], scope: 'project', confirm: true });
     expect(await run('init')).toBe(0);
     expect(calls).toEqual(['mcps', 'scope', 'confirm']);
-    expect(Object.keys(JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers)).toEqual(['context7']);
+    expect(Object.keys(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers)).toEqual(['context7']);
   });
 
   it('writes nothing when the confirmation is declined', async () => {
@@ -93,9 +100,7 @@ describe('runCli', () => {
   });
 
   it('exits 1 when a prompt is cancelled', async () => {
-    prompter.selectMcps = async () => {
-      throw new PromptCancelled();
-    };
+    prompter.selectMcps = () => Promise.reject(new PromptCancelled());
     expect(await run('init')).toBe(1);
     expect(text()).toContain('cancelled');
   });
@@ -136,14 +141,14 @@ describe('runCli', () => {
 
     it('overwrites with --force', async () => {
       expect(await run('init', '--yes', '--force', '--mcps', 'github', '--scope', 'project')).toBe(0);
-      expect(JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers.github.type).toBe('http');
+      expect(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers.github?.type).toBe('http');
     });
 
     it('asks per conflict interactively and honours skip', async () => {
       usePrompter({ mcps: ['github', 'context7'], scope: 'project', conflict: 'skip', confirm: true });
       expect(await run('init')).toBe(0);
-      const servers = JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers;
-      expect(servers.github.command).toBe('mine');
+      const servers = parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers;
+      expect(servers.github?.command).toBe('mine');
       expect(servers.context7).toBeDefined();
       expect(calls).toContain('conflict');
     });
@@ -151,7 +156,7 @@ describe('runCli', () => {
     it('asks per conflict interactively and honours overwrite', async () => {
       usePrompter({ mcps: ['github'], scope: 'project', conflict: 'overwrite', confirm: true });
       expect(await run('init')).toBe(0);
-      expect(JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers.github.type).toBe('http');
+      expect(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers.github?.type).toBe('http');
     });
   });
 
@@ -183,7 +188,7 @@ describe('runCli', () => {
         JSON.stringify({ name: 'mine', description: 'd', server: { type: 'stdio', command: 'x' } }),
       );
       expect(await run('init', '--source', dir, '--mcps', 'mine', '--scope', 'project')).toBe(0);
-      expect(JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers.mine.command).toBe('x');
+      expect(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers.mine?.command).toBe('x');
     });
 
     it('explains a malformed catalog.json instead of a stack trace', async () => {
