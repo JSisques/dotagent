@@ -1,0 +1,32 @@
+name: Chore
+description: Maintenance, tooling, CI or refactoring work
+labels: ['chore']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What needs maintenance and why?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should be done?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: A checklist that defines when this is done.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Dependencies, context or links.
