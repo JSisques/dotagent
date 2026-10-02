@@ -393,4 +393,127 @@ describe('runCli', () => {
       expect(text()).toContain('nope');
     });
   });
+
+  describe('status', () => {
+    const skillFile = () => join(tmp.cwd, '.claude', 'skills', 'example-skill', 'SKILL.md');
+    const manifestFile = () => join(tmp.homeDir, '.claude', '.shitaku', 'manifest.json');
+    const installBoth = async () => {
+      await run('init', '--yes', '--mcps', 'github', '--skills', 'example-skill', '--scope', 'project');
+      await run('init', '--mcps', 'context7', '--scope', 'user');
+      out = [];
+      err = [];
+    };
+
+    it('lists items per scope with target, kind, state and path', async () => {
+      await installBoth();
+      expect(await run('status')).toBe(0);
+      expect(out).toEqual([
+        'target: claude-code',
+        'project scope:',
+        '  mcps:',
+        `    github: installed  ${mcpFile()}`,
+        '  skills:',
+        `    example-skill: installed  ${join(tmp.cwd, '.claude', 'skills', 'example-skill')}`,
+        'user scope:',
+        '  mcps:',
+        `    context7: installed  ${join(tmp.homeDir, '.claude.json')}`,
+      ]);
+      expect(err).toEqual([]);
+    });
+
+    it('restricts the report to one scope with --scope', async () => {
+      await installBoth();
+      expect(await run('status', '--scope', 'user')).toBe(0);
+      expect(out.filter((l) => l.startsWith('    '))).toHaveLength(1);
+      expect(text()).toContain('context7');
+      expect(text()).not.toContain('github');
+    });
+
+    it('says there are no managed items without a manifest', async () => {
+      expect(await run('status')).toBe(0);
+      expect(out).toEqual(['target: claude-code', 'no managed items']);
+    });
+
+    it('reports drift and exits 0', async () => {
+      await installBoth();
+      await writeFile(skillFile(), 'edited');
+      await writeFile(mcpFile(), '{"mcpServers":{}}');
+      expect(await run('status')).toBe(0);
+      expect(text()).toMatch(/ {4}example-skill: modified/);
+      expect(text()).toMatch(/ {4}github: missing/);
+    });
+
+    it('prints catalog unavailable and unknown states when the catalog fails to load', async () => {
+      await installBoth();
+      expect(await run('status', '--source', join(tmp.root, 'nope'))).toBe(0);
+      expect(out[1]).toBe('catalog unavailable');
+      expect(text()).toMatch(/ {4}example-skill: unknown/);
+    });
+
+    it('warns on stderr about skipped catalog entries without polluting stdout', async () => {
+      const dir = join(tmp.root, 'partial');
+      await mkdir(join(dir, 'mcps'), { recursive: true });
+      await writeFile(join(dir, 'catalog.json'), JSON.stringify({ version: 1, items: { mcps: ['ghost'] } }));
+      await writeFile(join(dir, 'mcps', 'ghost.json'), '{ not json');
+      expect(await run('status', '--source', dir, '--json')).toBe(0);
+      expect(err.join('\n')).toMatch(/warning: skipped .*ghost/);
+      expect(JSON.parse(out.join('\n'))).toMatchObject({ catalog: 'available' });
+    });
+
+    describe('--json', () => {
+      it('prints one versioned document with every item field', async () => {
+        await installBoth();
+        expect(await run('status', '--json')).toBe(0);
+        expect(out).toHaveLength(1);
+        const doc = JSON.parse(out[0] ?? '') as { version: number; items: Record<string, unknown>[] };
+        expect(doc).toMatchObject({ version: 1, target: 'claude-code', catalog: 'available' });
+        expect(doc.items).toHaveLength(3);
+        expect(doc.items[0]).toEqual({
+          scope: 'project',
+          kind: 'mcp',
+          name: 'github',
+          state: 'installed',
+          path: mcpFile(),
+          installId: expect.stringMatching(/\S/) as string,
+        });
+        expect(err).toEqual([]);
+      });
+
+      it('reports an unavailable catalog as unknown with an empty-safe document', async () => {
+        await installBoth();
+        expect(await run('status', '--json', '--source', join(tmp.root, 'nope'))).toBe(0);
+        const doc = JSON.parse(out.join('\n')) as { catalog: string; items: { state: string }[] };
+        expect(doc.catalog).toBe('unavailable');
+        expect(doc.items.map((i) => i.state)).toEqual(['unknown', 'unknown', 'unknown']);
+      });
+
+      it('prints an empty items list without a manifest', async () => {
+        expect(await run('status', '--json')).toBe(0);
+        expect(JSON.parse(out.join('\n'))).toEqual({
+          version: 1,
+          target: 'claude-code',
+          catalog: 'available',
+          items: [],
+        });
+      });
+    });
+
+    describe('corrupt manifest', () => {
+      beforeEach(async () => {
+        await mkdir(join(tmp.homeDir, '.claude', '.shitaku'), { recursive: true });
+        await writeFile(manifestFile(), '{ not json');
+      });
+
+      it.each([
+        ['status', ['status']],
+        ['init', ['init', '--mcps', 'github', '--scope', 'project']],
+        ['undo', ['undo']],
+      ])('%s prints an error, no stack trace, and exits 1', async (_name, args) => {
+        expect(await run(...args)).toBe(1);
+        expect(err.join('\n')).toMatch(/^error: .*manifest/i);
+        expect(text()).not.toMatch(/\n\s+at /);
+        expect(out).toEqual([]);
+      });
+    });
+  });
 });
