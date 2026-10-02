@@ -4,7 +4,8 @@
 
 ### Requirement: Init flow
 
-`dotagent-cli init` MUST build a plan (selected MCPs, scope, target file, per-entry action) and then apply it. Interactive mode MUST prompt for MCPs and scope. Non-interactive mode MUST accept `--mcps <a,b>` and `--scope project|user` and MUST NOT prompt.
+`shitaku init` MUST build a plan (selected MCPs, scope, target file, per-entry action) and then apply it. Interactive mode MUST prompt for MCPs and scope. Non-interactive mode MUST accept `--mcps <a,b>` and `--scope project|user` and MUST NOT prompt. The CLI program name MUST be `shitaku`.
+(Previously: the command was `dotagent-cli init`)
 
 #### Scenario: Interactive
 
@@ -23,6 +24,12 @@
 - GIVEN `--mcps ghost`
 - WHEN run
 - THEN it exits non-zero naming `ghost`, writing nothing
+
+#### Scenario: Program name
+
+- GIVEN the CLI is invoked with `--help`
+- WHEN help is printed
+- THEN the program is named `shitaku` and no `dotagent-cli` text appears
 
 ### Requirement: Scope targets
 
