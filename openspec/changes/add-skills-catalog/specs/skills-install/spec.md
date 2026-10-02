@@ -125,6 +125,18 @@ With `--force`, a conflicting skill directory MUST be fully backed up and then r
 - WHEN `undo` runs
 - THEN `~/.claude/skills/` remains
 
+#### Scenario: Created directory holding only foreign files
+
+- GIVEN `.claude/skills/` was created by shitaku and now also holds a file or skill the user added outside `demo/`
+- WHEN `undo` runs
+- THEN `demo/` is removed, `.claude/skills/` is skipped and kept, and undo succeeds with exit 0 (with or without `--force`)
+
+#### Scenario: Skill file replaced by a symlink
+
+- GIVEN a recorded skill file was replaced by a symlink after install
+- WHEN `undo` runs without `--force`
+- THEN it refuses with exit 3, lists the path as changed, and touches nothing
+
 #### Scenario: Undo of forced replace
 
 - GIVEN `demo` replaced a non-owned directory via `--force`

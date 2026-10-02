@@ -112,3 +112,65 @@ Notes: O_NOFOLLOW guards the final path component only; intermediate directories
 Verification: `pnpm test` 20 files, 230 tests pass (was 221); typecheck, lint, format:check ok; `test/architecture.test.ts` unchanged.
 
 Skipped: S-a, S-b, S-e. Still open: S1 frontmatter block scalars/lists, S2 duplicate keys last wins, slice over 400 lines (`size:exception`).
+
+## Slice 3 (tasks 3.1-3.5): DONE. Mode: Strict TDD. Branch: feat/skills-catalog-3-apply-undo (stacked on slice 2, PR #37)
+
+Completed: 3.1, 3.2, 3.3, 3.4, 3.5. Remaining: slice 4 (4.1-4.5). Not committed; changes are in the working tree.
+
+### TDD Cycle Evidence
+
+| Task | Test file                                                          | Layer       | Safety net | RED                                                          | GREEN                  | Triangulate                                                                                                                                | Refactor                                                                                      |
+| ---- | ------------------------------------------------------------------ | ----------- | ---------- | ------------------------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 3.1  | test/application/init-mcps.test.ts (`applyPlan (skills)`)          | Integration | 30/30      | 8 failed (30 passed)                                         | 38/38 with 3.2         | create+binary, createdDirs, SKILL.md last, update, force, skip/conflict/dry-run, mixed MCP+skill, stale                                    | None                                                                                          |
+| 3.2  | same                                                               | Integration | same       | same run                                                     | 133/133 domain+app     | as 3.1                                                                                                                                     | `scope` added to SkillPlanEntry/SkillChange (RED in skill-plan.test.ts: 1 failed, then 15/15) |
+| 3.3  | test/application/init-mcps.test.ts (`applyPlan rollback (skills)`) | Integration | 38/38      | 4 failed of 5 (the backup-write-failure case passed already) | 58/58 test/application | third of four writes, forced replace with last write failing, backup write failing, MCP written earlier, incomplete rollback then conflict | rollback helpers extracted (`restoreText`, `restoreBytes`, `rollback`)                        |
+| 3.4  | test/application/undo-install.test.ts (`undoInstall (skills)`)     | Integration | 10/10      | 10 failed (10 passed)                                        | 20/20 with 3.5         | clean, pre-existing dir kept, extra file, modified file, --force, non-empty created dir, forced replace, update, root LIFO, dry run        | None                                                                                          |
+| 3.5  | same                                                               | Integration | same       | same run                                                     | 68/68 test/application | as 3.4                                                                                                                                     | `currentHash`, `isSkillFile`, `unrecordedFiles` helpers                                       |
+
+### Work Unit Evidence
+
+| Evidence             | Value                                                                                                                                                                                                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focused test command | `pnpm vitest run test/application` -> 68/68 pass. Full `pnpm test`: 20 files, 254 tests pass (was 230)                                                                                                                                               |
+| Runtime harness      | Real NodeFileSystem on temp dirs plus `faultyFs` (test/helpers/skills.ts), a wrapper that throws on the nth matching `writeBytes`/`writeAtomic`/`remove` and records the call order; apply then undo end to end, including forced replace and update |
+| Rollback boundary    | Revert the slice-3 PR: `applyPlan`/`undoInstall` changes, `scope`/`writesSkill` in skill-plan.ts, test helper. Unreachable from the CLI until slice 4                                                                                                |
+
+### Verification
+
+`pnpm test` 254/254, `pnpm run typecheck`, `pnpm run lint`, `pnpm run format:check` all exit 0. `test/architecture.test.ts` unchanged and green.
+
+### Behavior implemented
+
+- applyPlan: refreshes each writable skill (re-reads with the no-follow guards, re-plans, `StaleFileError` when the action changes); computes `createdDirs` (missing ancestors, parents first) before any write; writes all backups first (MCP text, skill bytes), then MCP files, then skills (non-SKILL.md files, deletions, SKILL.md last); one Install record; manifest appended last.
+- Failure: every completed write is reverted newest first (restore bytes or remove), then `createdDirs` are removed deepest first with non-recursive `removeDir`; backups stay on disk; the original error is rethrown, annotated `rollback incomplete: ...` if a revert step failed. No manifest entry on failure. This also now covers an MCP file written earlier in the same install.
+- undoInstall: skill files are compared and restored as bytes (MCP config files stay text, because `readBytes` has a 1 MiB limit); unrecorded files under a skill root count as drift (exit 3, listed in `changed`); `--force` restores the recorded files and leaves unknown files, and non-empty directories are skipped; `createdDirs` pruned deepest first; LIFO also blocks on a newer non-undone install owning the same skill root.
+- Orphaned skill dir after a crash: no production change needed, planInit already reports an unowned existing dir as `conflict`; locked in by the incomplete-rollback test.
+
+### Deviations from design
+
+- `scope` was added to `SkillPlanEntry` and `SkillChange` so apply can record the scope per file (design only had root).
+- Rollback also reverts MCP files written earlier in the same install (design only described skills).
+- A non-empty created directory that holds only unrelated user files (for example another skill under a freshly created `.claude/skills`) is skipped silently and undo succeeds; only user files under a skill root refuse.
+- Backups of a removed or replaced file are all kept after a failed apply (design: "plus the backups on disk").
+- Every file of an updated skill is rewritten and recorded (even if unchanged), so the unrecorded-file drift check never flags an unchanged recorded file.
+
+### Slice size
+
+About 640 added lines (594 inserted + 71 new helper, minus 44 modified), tests about 60%. Over the 400 budget; no tests trimmed. Recommend `size:exception`.
+
+### Carried-forward open notes
+
+S1 frontmatter block scalars/lists, S2 duplicate keys last wins, S-a umask on writeBytes, S-b mode not hashed. Undo of a skill file that is a symlink raises `UnsafeTreeError` (exit 1) rather than refusing with exit 3.
+
+### Slice 3 remediation (verify warnings W-a, W-b, S-g, S-f partial, W-c, W-d)
+
+Strict TDD: tests written first, RED observed (4 failed / 21 passed in `undo-install.test.ts`: both symlink tests, missing backup, tampered createdDirs; the foreign-files test already passed and is a characterization test).
+
+- W-a: `undoInstall` drift scan now maps `UnsafeTreeError` to drift. A recorded file that is a symlink is listed in `changed`; a symlink or special file under a skill root lists the root. Both refuse with exit 3 and touch nothing.
+- W-b: `assertBackupsPresent` checks every referenced backup with `fs.exists` before the first restore; a missing one throws `UndoVerifyError` ("nothing was changed"), manifest stays not-undone, files untouched, rerun gives the same error. Placed after drift/dry-run so a dry run is unchanged.
+- S-g: `prunableDirs` ignores (does not refuse) any `createdDirs` entry that is not a recorded skill root, an ancestor, or a subdirectory of one, strictly inside the home or working directory. Ignoring keeps a tampered manifest from blocking undo while never touching foreign paths (`rmdir` is non-recursive anyway).
+- S-f: added mixed MCP+skill undo test and a test where the MCP restore also fails during rollback (both are characterization tests, green on first run; production unchanged for them).
+- W-c/W-d (docs only): design.md states that skipping a non-empty created dir is unconditional, not a `--force` behavior, plus the backups-present and createdDirs filter notes; scenarios added to `specs/skills-install/spec.md` (foreign-only created dir, symlinked file) and `specs/install-safety/spec.md` (missing backup, failed-apply backups kept on disk without manifest reference); task 3.4 updated.
+- Verification: `pnpm test` 20 files, 261 tests pass (was 254); typecheck, lint, format:check exit 0; `test/architecture.test.ts` unchanged.
+
+Still open: S-h (MCP-side dirs not tracked in createdDirs), S-i (`exists` follows symlinks), S-j / S-a (umask on writeBytes), S-b (mode not hashed), S1, S2, and all slice-1/2 open items. Next: slice 4.

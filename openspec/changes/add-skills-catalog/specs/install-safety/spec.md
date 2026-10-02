@@ -59,3 +59,11 @@ A skill install MUST NOT leave a partially written skill directory. On any write
 - GIVEN a forced replace fails after the old directory was backed up
 - WHEN apply runs
 - THEN the original directory is restored byte-identical
+
+Backups written for an install that then fails and is rolled back stay on disk under the state directory. They are referenced by no manifest entry and are not cleaned up automatically; removing them is a manual step.
+
+#### Scenario: Missing backup at undo
+
+- GIVEN a backup file required by `undo` was deleted
+- WHEN `undo` runs
+- THEN it fails before restoring or removing anything, the manifest still lists the install as not undone, and a rerun fails the same way

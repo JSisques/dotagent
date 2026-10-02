@@ -65,11 +65,11 @@ Base branches (stacked-to-main): each PR targets `main` after the previous merge
 
 ## Slice 3: Apply and undo
 
-- [ ] 3.1 RED `init-mcps.test.ts`: apply create/update/force/skip writes bytes, SKILL.md last, one Install record, `afterHash:null` for removed files, `--dry-run` writes nothing
-- [ ] 3.2 GREEN `init-mcps.ts` applyPlan skill path: refresh, `StaleFileError`, backups first, createdDirs
-- [ ] 3.3 RED then GREEN rollback with faulty FS: third of four writes fails (no manifest entry, dirs removed); forced replace failure restores byte-identical (install-safety Multi-file write failure)
-- [ ] 3.4 RED `undo-install.test.ts`: clean undo prunes created dirs deepest-first, keeps pre-existing `~/.claude/skills`, user-added file refuses exit 3, modified file refuses, `--force` keeps unknown files, undo of forced replace restores, same-root LIFO block
-- [ ] 3.5 GREEN `src/application/undo-install.ts`: bytes restore, extra-file drift, pruning, root LIFO
+- [x] 3.1 RED `init-mcps.test.ts`: apply create/update/force/skip writes bytes, SKILL.md last, one Install record, `afterHash:null` for removed files, `--dry-run` writes nothing
+- [x] 3.2 GREEN `init-mcps.ts` applyPlan skill path: refresh, `StaleFileError`, backups first, createdDirs
+- [x] 3.3 RED then GREEN rollback with faulty FS: third of four writes fails (no manifest entry, dirs removed); forced replace failure restores byte-identical (install-safety Multi-file write failure)
+- [x] 3.4 RED `undo-install.test.ts`: clean undo prunes created dirs deepest-first, keeps pre-existing `~/.claude/skills`, user-added file refuses exit 3, modified file refuses, `--force` keeps unknown files, undo of forced replace restores, same-root LIFO block, created dir holding only foreign files is skipped and undo succeeds (not a `--force` behavior), symlinked recorded file refuses exit 3, missing backup refuses before any mutation, tampered `createdDirs` entry ignored
+- [x] 3.5 GREEN `src/application/undo-install.ts`: bytes restore, extra-file drift, pruning, root LIFO
 
 ## Slice 4: CLI, prompter, docs
 
