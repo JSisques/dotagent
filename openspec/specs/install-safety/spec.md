@@ -15,7 +15,6 @@ With `--dry-run`, the system MUST print the plan and MUST NOT create, modify, or
 ### Requirement: Backup and atomic write
 
 Before modifying an existing file, the system MUST back it up to `~/.claude/.shitaku/backups/`. Writes MUST be atomic (temp file then rename). The target MUST be re-read immediately before writing, and changes made since planning MUST be merged, not lost.
-(Previously: backups went to `~/.claude/.dotagent/backups/`)
 
 #### Scenario: Backup taken
 
@@ -37,18 +36,17 @@ Before modifying an existing file, the system MUST back it up to `~/.claude/.shi
 
 ### Requirement: Manifest
 
-After a successful apply, the system MUST record each managed entry in `~/.claude/.shitaku/manifest.json` with file, key path, backup path, and a SHA-256 hash of the written content.
-(Previously: the manifest was `~/.claude/.dotagent/manifest.json`)
+After a successful apply, the system MUST record each managed entry in `~/.claude/.shitaku/manifest.json` with kind (`mcp` or `skill`), file, key path (MCP), backup path, and a SHA-256 hash of the written content. A skill MUST be recorded per file plus a per-skill tree hash and a flag for directories shitaku created. One install record MUST cover both kinds. The manifest version MUST NOT change.
 
 #### Scenario: Manifest written
 
-- GIVEN `github` is installed
+- GIVEN `github` and skill `demo` are installed
 - WHEN apply completes
-- THEN `~/.claude/.shitaku/manifest.json` lists `github` with its hash
+- THEN the manifest lists `github` (kind `mcp`) and `demo` (kind `skill`) with hashes in one install record
 
 ### Requirement: Undo
 
-`undo` MUST restore managed files from backups. It MUST first compare current content hashes to the manifest, and MUST refuse for changed entries without `--force`.
+`undo` MUST restore managed files from backups. It MUST first compare current content hashes to the manifest, and MUST refuse for changed entries without `--force`. For skills it MUST remove only files and directories shitaku created, MUST refuse when the skill directory contains user-added files or differs from the recorded tree hash, and MUST NOT remove directories that pre-existed the install.
 
 #### Scenario: Clean undo
 
@@ -58,9 +56,21 @@ After a successful apply, the system MUST record each managed entry in `~/.claud
 
 #### Scenario: Changed since install
 
-- GIVEN the user edited `mcpServers.github` after install
+- GIVEN the user edited `mcpServers.github` or a skill file after install
 - WHEN `undo` runs
 - THEN it warns, leaves the entry, and exits non-zero unless `--force`
+
+#### Scenario: Skill drift or extra file
+
+- GIVEN `demo/extra.md` was added by the user
+- WHEN `undo` runs without `--force`
+- THEN `demo/` is untouched and exit is non-zero
+
+#### Scenario: Missing backup at undo
+
+- GIVEN a backup file required by `undo` was deleted
+- WHEN `undo` runs
+- THEN it fails before restoring or removing anything, the manifest still lists the install as not undone, and a rerun fails the same way
 
 #### Scenario: No manifest
 
@@ -107,3 +117,19 @@ The system MUST NOT read, migrate, or fall back to `~/.claude/.dotagent/`. State
 - GIVEN `~/.claude/.dotagent/manifest.json` exists and `~/.claude/.shitaku/` does not
 - WHEN `undo` runs
 - THEN it reports nothing to undo and leaves the legacy directory untouched
+
+### Requirement: Multi-file write failure
+
+A skill install MUST NOT leave a partially written skill directory. On any write failure the system MUST remove files and directories it created for that skill, restore any replaced directory from backup, report the error, and record no manifest entry for it. Skills MUST be written atomically per file (temp then rename), and the manifest MUST NOT list a skill until all its files are written. Backups written for an install that then fails and is rolled back stay on disk under the state directory; they are referenced by no manifest entry and are not cleaned up automatically, so removing them is a manual step.
+
+#### Scenario: Failure mid-skill
+
+- GIVEN the third of four files fails to write
+- WHEN apply runs
+- THEN the created files and directories are removed, the error is reported, and the manifest has no entry for the skill
+
+#### Scenario: Failure during forced replace
+
+- GIVEN a forced replace fails after the old directory was backed up
+- WHEN apply runs
+- THEN the original directory is restored byte-identical
