@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FolderCatalogSource } from '@/adapters/catalog/folder-source.js';
@@ -14,9 +14,10 @@ const TOKEN = 'abc123-secret-value';
 
 /** Scripted prompter; any call it was not scripted for fails the test. */
 function fakePrompter(
-  script: Partial<Record<'mcps' | 'scope' | 'confirm', unknown>> & { conflict?: 'overwrite' | 'skip' } = {},
+  script: Partial<Record<'mcps' | 'skills' | 'scope' | 'confirm', unknown>> & { conflict?: 'overwrite' | 'skip' } = {},
 ) {
   const calls: string[] = [];
+  const conflicts: { kind: string; name: string; reason: string }[] = [];
   const unscripted = (name: string): never => {
     throw new Error(`unexpected prompt: ${name}`);
   };
@@ -25,18 +26,26 @@ function fakePrompter(
       calls.push('mcps'),
       Promise.resolve((script.mcps as string[] | undefined) ?? unscripted('mcps'))
     ),
+    selectSkills: () => (
+      calls.push('skills'),
+      Promise.resolve((script.skills as string[] | undefined) ?? unscripted('skills'))
+    ),
     selectScope: () => (
       calls.push('scope'),
       Promise.resolve((script.scope as 'project' | 'user' | undefined) ?? unscripted('scope'))
     ),
-    resolveConflict: () => (calls.push('conflict'), Promise.resolve(script.conflict ?? unscripted('conflict'))),
+    resolveConflict: (c) => (
+      calls.push('conflict'),
+      conflicts.push(c),
+      Promise.resolve(script.conflict ?? unscripted('conflict'))
+    ),
     confirm: () => (
       calls.push('confirm'),
       Promise.resolve((script.confirm as boolean | undefined) ?? unscripted('confirm'))
     ),
     info: () => {},
   };
-  return { prompter, calls };
+  return { prompter, calls, conflicts };
 }
 
 describe('runCli', () => {
@@ -45,6 +54,7 @@ describe('runCli', () => {
   let err: string[];
   let prompter: Prompter;
   let calls: string[];
+  let conflicts: { kind: string; name: string; reason: string }[];
   let env: Record<string, string | undefined>;
   const mcpFile = () => join(tmp.cwd, '.mcp.json');
   const text = () => [...out, ...err].join('\n');
@@ -62,7 +72,8 @@ describe('runCli', () => {
     };
     return runCli(['node', 'shitaku', ...args], deps);
   };
-  const usePrompter = (script?: Parameters<typeof fakePrompter>[0]) => ({ prompter, calls } = fakePrompter(script));
+  const usePrompter = (script?: Parameters<typeof fakePrompter>[0]) =>
+    ({ prompter, calls, conflicts } = fakePrompter(script));
 
   beforeEach(async () => {
     tmp = await makeTmpPaths();
@@ -86,14 +97,14 @@ describe('runCli', () => {
   });
 
   it('prompts for MCPs, scope and confirmation interactively', async () => {
-    usePrompter({ mcps: ['context7'], scope: 'project', confirm: true });
+    usePrompter({ mcps: ['context7'], skills: [], scope: 'project', confirm: true });
     expect(await run('init')).toBe(0);
-    expect(calls).toEqual(['mcps', 'scope', 'confirm']);
+    expect(calls).toEqual(['mcps', 'skills', 'scope', 'confirm']);
     expect(Object.keys(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers)).toEqual(['context7']);
   });
 
   it('writes nothing when the confirmation is declined', async () => {
-    usePrompter({ mcps: ['context7'], scope: 'project', confirm: false });
+    usePrompter({ mcps: ['context7'], skills: [], scope: 'project', confirm: false });
     expect(await run('init')).toBe(0);
     await expect(readFile(mcpFile(), 'utf8')).rejects.toThrow();
     expect(await readdir(tmp.homeDir)).toEqual([]);
@@ -111,7 +122,7 @@ describe('runCli', () => {
     expect(await readdir(tmp.cwd)).toEqual([]);
   });
 
-  it('requires --mcps and --scope with --yes', async () => {
+  it('requires --scope with --yes', async () => {
     expect(await run('init', '--yes', '--mcps', 'github')).toBe(1);
     expect(text()).toContain('--scope');
     expect(calls).toEqual([]);
@@ -122,6 +133,147 @@ describe('runCli', () => {
     expect(text()).toMatch(/github.*create/);
     expect(text()).toContain('close Claude Code');
     expect(await readdir(tmp.homeDir)).toEqual([]);
+  });
+
+  describe('skills', () => {
+    const skillDir = () => join(tmp.cwd, '.claude', 'skills', 'example-skill');
+    const skillFile = () => join(skillDir(), 'SKILL.md');
+    const bundled = () => readFile(join(CATALOG, 'skills', 'example-skill', 'SKILL.md'), 'utf8');
+
+    it('lists --skills in init help', async () => {
+      expect(await run('init', '--help')).toBe(0);
+      expect(text()).toContain('--skills');
+    });
+
+    it('installs only skills without touching the MCP file, then undo reverts it', async () => {
+      expect(await run('init', '--skills', 'example-skill', '--scope', 'project')).toBe(0);
+      expect(await readFile(skillFile(), 'utf8')).toBe(await bundled());
+      await expect(readFile(mcpFile(), 'utf8')).rejects.toThrow();
+      expect(calls).toEqual([]);
+      expect(text()).not.toContain('.mcp.json');
+      expect(text()).toContain(skillDir());
+      expect(await run('undo')).toBe(0);
+      await expect(readdir(join(tmp.cwd, '.claude'))).rejects.toThrow();
+    });
+
+    it('installs both kinds under one scope and undoes them together', async () => {
+      expect(await run('init', '--yes', '--mcps', 'github', '--skills', 'example-skill', '--scope', 'project')).toBe(0);
+      expect(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers.github).toBeDefined();
+      expect(await readFile(skillFile(), 'utf8')).toBe(await bundled());
+      expect(await run('undo')).toBe(0);
+      await expect(readFile(mcpFile(), 'utf8')).rejects.toThrow();
+      await expect(readFile(skillFile(), 'utf8')).rejects.toThrow();
+    });
+
+    it('installs at user scope', async () => {
+      expect(await run('init', '--skills', 'example-skill', '--scope', 'user')).toBe(0);
+      expect(await readFile(join(tmp.homeDir, '.claude', 'skills', 'example-skill', 'SKILL.md'), 'utf8')).toBe(
+        await bundled(),
+      );
+    });
+
+    it('exits 1 with --yes and neither --mcps nor --skills, writing nothing', async () => {
+      expect(await run('init', '--yes', '--scope', 'project')).toBe(1);
+      expect(text()).toContain('--mcps');
+      expect(text()).toContain('--skills');
+      expect(calls).toEqual([]);
+      expect(await readdir(tmp.cwd)).toEqual([]);
+    });
+
+    it('exits 1 naming an unknown skill and writes nothing', async () => {
+      expect(await run('init', '--skills', 'ghost', '--scope', 'project')).toBe(1);
+      expect(text()).toContain('ghost');
+      expect(await readdir(tmp.cwd)).toEqual([]);
+    });
+
+    it('exits 1 when the target skill directory is a symlink, even with --force', async () => {
+      await mkdir(join(tmp.cwd, '.claude', 'skills'), { recursive: true });
+      await symlink(tmp.root, skillDir());
+      expect(await run('init', '--skills', 'example-skill', '--scope', 'project', '--force')).toBe(1);
+    });
+
+    it('prints the plan and writes nothing on --dry-run', async () => {
+      expect(await run('init', '--skills', 'example-skill', '--scope', 'project', '--dry-run')).toBe(0);
+      expect(text()).toMatch(/example-skill.*create/);
+      await expect(readdir(join(tmp.cwd, '.claude'))).rejects.toThrow();
+      expect(await readdir(tmp.homeDir)).toEqual([]);
+    });
+
+    it('prompts for MCPs, skills, scope and confirmation, then installs the skill', async () => {
+      usePrompter({ mcps: [], skills: ['example-skill'], scope: 'project', confirm: true });
+      expect(await run('init')).toBe(0);
+      expect(calls).toEqual(['mcps', 'skills', 'scope', 'confirm']);
+      expect(await readFile(skillFile(), 'utf8')).toBe(await bundled());
+      await expect(readFile(mcpFile(), 'utf8')).rejects.toThrow();
+    });
+
+    it('skips the skills prompt when the catalog has no skills', async () => {
+      const dir = join(tmp.root, 'mcp-only');
+      await mkdir(join(dir, 'mcps'), { recursive: true });
+      await writeFile(join(dir, 'catalog.json'), JSON.stringify({ version: 1, items: { mcps: ['mine'] } }));
+      await writeFile(
+        join(dir, 'mcps', 'mine.json'),
+        JSON.stringify({ name: 'mine', description: 'd', server: { type: 'stdio', command: 'x' } }),
+      );
+      usePrompter({ mcps: ['mine'], scope: 'project', confirm: true });
+      expect(await run('init', '--source', dir)).toBe(0);
+      expect(calls).toEqual(['mcps', 'scope', 'confirm']);
+    });
+
+    it('exits 1 when the interactive selection is empty for both kinds', async () => {
+      usePrompter({ mcps: [], skills: [], scope: 'project' });
+      expect(await run('init')).toBe(1);
+      expect(text()).toMatch(/at least one/i);
+      expect(calls).not.toContain('confirm');
+    });
+
+    it('writes nothing when the interactive confirmation is declined', async () => {
+      usePrompter({ mcps: [], skills: ['example-skill'], scope: 'project', confirm: false });
+      expect(await run('init')).toBe(0);
+      await expect(readdir(join(tmp.cwd, '.claude'))).rejects.toThrow();
+    });
+
+    describe('conflicts', () => {
+      const mine = '---\nname: example-skill\ndescription: mine\n---\n';
+      beforeEach(async () => {
+        await mkdir(skillDir(), { recursive: true });
+        await writeFile(skillFile(), mine);
+      });
+
+      it('exits 2 non-interactively, reports it and leaves the user skill alone', async () => {
+        expect(await run('init', '--skills', 'example-skill', '--scope', 'project')).toBe(2);
+        expect(text()).toContain('example-skill');
+        expect(text()).toContain('--force');
+        expect(await readFile(skillFile(), 'utf8')).toBe(mine);
+        expect(await readdir(skillDir())).toEqual(['SKILL.md']);
+        expect(await readdir(tmp.homeDir)).toEqual([]);
+        expect(calls).toEqual([]);
+      });
+
+      it('replaces the whole directory with --force after a backup, and undo restores it', async () => {
+        await writeFile(join(skillDir(), 'notes.txt'), 'mine too');
+        expect(await run('init', '--yes', '--force', '--skills', 'example-skill', '--scope', 'project')).toBe(0);
+        expect(await readFile(skillFile(), 'utf8')).toBe(await bundled());
+        expect(await readdir(skillDir())).toEqual(['SKILL.md']);
+        expect(await run('undo')).toBe(0);
+        expect(await readFile(skillFile(), 'utf8')).toBe(mine);
+        expect(await readFile(join(skillDir(), 'notes.txt'), 'utf8')).toBe('mine too');
+      });
+
+      it('asks per skill conflict interactively and honours skip', async () => {
+        usePrompter({ mcps: [], skills: ['example-skill'], scope: 'project', conflict: 'skip', confirm: true });
+        expect(await run('init')).toBe(0);
+        expect(conflicts.map((c) => [c.kind, c.name])).toEqual([['skill', 'example-skill']]);
+        expect(conflicts[0]?.reason).toMatch(/different skill/);
+        expect(await readFile(skillFile(), 'utf8')).toBe(mine);
+      });
+
+      it('asks per skill conflict interactively and honours overwrite', async () => {
+        usePrompter({ mcps: [], skills: ['example-skill'], scope: 'project', conflict: 'overwrite', confirm: true });
+        expect(await run('init')).toBe(0);
+        expect(await readFile(skillFile(), 'utf8')).toBe(await bundled());
+      });
+    });
   });
 
   describe('conflicts', () => {
@@ -145,16 +297,17 @@ describe('runCli', () => {
     });
 
     it('asks per conflict interactively and honours skip', async () => {
-      usePrompter({ mcps: ['github', 'context7'], scope: 'project', conflict: 'skip', confirm: true });
+      usePrompter({ mcps: ['github', 'context7'], skills: [], scope: 'project', conflict: 'skip', confirm: true });
       expect(await run('init')).toBe(0);
       const servers = parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers;
       expect(servers.github?.command).toBe('mine');
       expect(servers.context7).toBeDefined();
       expect(calls).toContain('conflict');
+      expect(conflicts[0]).toMatchObject({ kind: 'mcp', name: 'github' });
     });
 
     it('asks per conflict interactively and honours overwrite', async () => {
-      usePrompter({ mcps: ['github'], scope: 'project', conflict: 'overwrite', confirm: true });
+      usePrompter({ mcps: ['github'], skills: [], scope: 'project', conflict: 'overwrite', confirm: true });
       expect(await run('init')).toBe(0);
       expect(parseDoc(await readFile(mcpFile(), 'utf8')).mcpServers.github?.type).toBe('http');
     });

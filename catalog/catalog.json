@@ -2,6 +2,7 @@
   "version": 1,
   "items": {
     "mcps": ["github", "context7"],
+    "skills": ["example-skill"],
     "profiles": ["base", "web"]
   }
 }

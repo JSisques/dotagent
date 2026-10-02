@@ -43,4 +43,12 @@ describe('claude-code target', () => {
     });
     expect(target.toEntry(stdio)).toEqual({ type: 'stdio', command: 'npx', args: ['-y', 'pkg'], env: { K: '${K}' } });
   });
+
+  it('puts skills under ~/.claude/skills for user scope', () => {
+    expect(target.skillsDir('user', paths)).toBe('/h/.claude/skills');
+  });
+
+  it('puts skills under ./.claude/skills for project scope', () => {
+    expect(target.skillsDir('project', paths)).toBe('/w/.claude/skills');
+  });
 });

@@ -1,4 +1,4 @@
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { claudeCodeTarget } from '@/adapters/claude-code/target.js';
@@ -12,11 +12,16 @@ import {
   planInit,
   StaleFileError,
   UnknownMcpError,
+  UnknownSkillError,
   type InitDeps,
 } from '@/application/init-mcps.js';
 import { appendInstall, manifestPath, stateDir } from '@/application/journal.js';
-import { hashEntry, sha256 } from '@/domain/hash.js';
+import type { SkillItem } from '@/domain/catalog/skill.js';
+import { hashEntry, sha256, treeHash } from '@/domain/hash.js';
+import type { CatalogSource } from '@/ports/catalog-source.js';
+import { UnsafeTreeError } from '@/ports/file-system.js';
 import { parseManifest, type Manifest } from '@/domain/manifest.js';
+import { DEMO_V1, DEMO_V2, faultyFs, skillSource } from '@test/helpers/skills.js';
 import { parseDoc } from '@test/helpers/parse-doc.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
@@ -189,6 +194,7 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
           items: [{ kind: 'mcp', name: 'github', action: 'create', entryHash: hashEntry(stale) }],
         },
       ],
+      createdDirs: [],
     });
     const owned = await planInit(deps, { mcps: ['github'], scope: 'project' });
     expect(owned.files[0]?.items[0]?.action).toBe('update');
@@ -241,5 +247,438 @@ describe('initMcps (user scope)', () => {
     await expect(initMcps(deps, { mcps: ['github'], scope: 'user' })).rejects.toThrow(ConfigError);
     expect(await readFile(userFile(), 'utf8')).toBe('{ nope');
     expect(await readdir(tmp.homeDir)).toEqual(['.claude.json']);
+  });
+});
+
+describe('planInit (skills)', () => {
+  const enc = (text: string) => new TextEncoder().encode(text);
+  const v1: SkillItem = {
+    name: 'demo',
+    description: 'd',
+    files: [
+      { path: 'SKILL.md', bytes: enc('one') },
+      { path: 'notes.md', bytes: enc('n') },
+    ],
+  };
+  const v2: SkillItem = { ...v1, files: [{ path: 'SKILL.md', bytes: enc('two') }] };
+  const source = (skills: SkillItem[]): CatalogSource => ({
+    ref: () => ({ kind: 'bundled', location: '/catalog' }),
+    load: () => Promise.resolve({ mcps: [], skills, profiles: [], issues: [] }),
+  });
+
+  let tmp: TmpPaths;
+  let deps: InitDeps;
+  const userRoot = () => join(tmp.homeDir, '.claude', 'skills', 'demo');
+  const projectRoot = () => join(tmp.cwd, '.claude', 'skills', 'demo');
+  const put = async (root: string, files: Record<string, string>) => {
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(join(root, path, '..'), { recursive: true });
+      await writeFile(join(root, path), text);
+    }
+  };
+  const seedOwnership = (root: string, item: SkillItem) =>
+    appendInstall(deps.fs, tmp.homeDir, {
+      id: 'seed',
+      createdAt: '2026-10-02T00:00:00.000Z',
+      undoneAt: null,
+      source: { kind: 'bundled', location: '/catalog', catalogVersion: 1 },
+      files: item.files.map((f) => ({
+        path: join(root, f.path),
+        scope: 'user' as const,
+        backup: null,
+        beforeHash: null,
+        afterHash: sha256(f.bytes),
+        items: [
+          {
+            kind: 'skill' as const,
+            name: item.name,
+            action: 'create' as const,
+            entryHash: treeHash(item.files) ?? '',
+            root,
+          },
+        ],
+      })),
+      createdDirs: [],
+    });
+  beforeEach(async () => {
+    tmp = await makeTmpPaths();
+    deps = {
+      source: source([v2]),
+      fs: new NodeFileSystem(),
+      target: claudeCodeTarget,
+      paths: { homeDir: tmp.homeDir, cwd: tmp.cwd },
+      env: {},
+    };
+  });
+  afterEach(() => tmp.cleanup());
+
+  it('plans a create under ~/.claude/skills for user scope and plans no MCP file', async () => {
+    const plan = await planInit(deps, { mcps: [], skills: ['demo'], scope: 'user' });
+    expect(plan.files).toEqual([]);
+    expect(plan.skills).toHaveLength(1);
+    expect(plan.skills[0]).toMatchObject({ name: 'demo', root: userRoot(), action: 'create', presentHash: null });
+  });
+
+  it('plans under ./.claude/skills for project scope', async () => {
+    const plan = await planInit(deps, { mcps: [], skills: ['demo'], scope: 'project' });
+    expect(plan.skills[0]?.root).toBe(projectRoot());
+  });
+
+  it('plans MCPs and skills together, leaving the skills empty when none are requested', async () => {
+    deps = { ...deps, source: new FolderCatalogSource(CATALOG, 'bundled') };
+    const both = await planInit(deps, { mcps: ['github'], skills: ['example-skill'], scope: 'project' });
+    expect(both.files).toHaveLength(1);
+    expect(both.skills.map((s) => s.name)).toEqual(['example-skill']);
+    expect((await planInit(deps, { mcps: ['github'], scope: 'project' })).skills).toEqual([]);
+  });
+
+  it('skips an identical tree on disk', async () => {
+    await put(projectRoot(), { 'SKILL.md': 'two' });
+    const plan = await planInit(deps, { mcps: [], skills: ['demo'], scope: 'project' });
+    expect(plan.skills[0]).toMatchObject({ action: 'skip', reason: 'already installed' });
+  });
+
+  it('plans an update of an owned tree and lists the dropped file', async () => {
+    await put(userRoot(), { 'SKILL.md': 'one', 'notes.md': 'n' });
+    await seedOwnership(userRoot(), v1);
+    const plan = await planInit(deps, { mcps: [], skills: ['demo'], scope: 'user' });
+    expect(plan.skills[0]).toMatchObject({ action: 'update', removed: ['notes.md'] });
+    expect(plan.skills[0]?.present.map((f) => f.path)).toEqual(['SKILL.md', 'notes.md']);
+  });
+
+  it('plans a conflict for an owned tree modified since the install', async () => {
+    await put(userRoot(), { 'SKILL.md': 'one', 'notes.md': 'edited' });
+    await seedOwnership(userRoot(), v1);
+    const plan = await planInit(deps, { mcps: [], skills: ['demo'], scope: 'user' });
+    expect(plan.skills[0]?.action).toBe('conflict');
+  });
+
+  it('plans a conflict for an unowned tree and a forced update with --force', async () => {
+    await put(projectRoot(), { 'SKILL.md': 'mine' });
+    expect((await planInit(deps, { mcps: [], skills: ['demo'], scope: 'project' })).skills[0]?.action).toBe('conflict');
+    const forced = await planInit(deps, { mcps: [], skills: ['demo'], scope: 'project', force: true });
+    expect(forced.skills[0]).toMatchObject({ action: 'update', reason: 'replaced by --force' });
+  });
+
+  it('rejects an unknown skill name', async () => {
+    await expect(planInit(deps, { mcps: [], skills: ['demo', 'nope'], scope: 'user' })).rejects.toThrow(
+      UnknownSkillError,
+    );
+    await expect(planInit(deps, { mcps: [], skills: ['nope'], scope: 'user' })).rejects.toThrow('unknown skill: nope');
+  });
+
+  it('fails planning when the skill directory is a symlink, even with --force', async () => {
+    await mkdir(join(projectRoot(), '..'), { recursive: true });
+    await mkdir(join(tmp.root, 'elsewhere'));
+    await symlink(join(tmp.root, 'elsewhere'), projectRoot());
+    for (const force of [false, true]) {
+      await expect(planInit(deps, { mcps: [], skills: ['demo'], scope: 'project', force })).rejects.toThrow(
+        UnsafeTreeError,
+      );
+    }
+  });
+
+  it('fails planning when the target holds a symlink inside the skill', async () => {
+    await put(projectRoot(), { 'SKILL.md': 'x' });
+    await symlink(join(tmp.root, 'nowhere'), join(projectRoot(), 'link.md'));
+    await expect(planInit(deps, { mcps: [], skills: ['demo'], scope: 'project', force: true })).rejects.toThrow(
+      UnsafeTreeError,
+    );
+  });
+
+  it('plans each skill once when the request repeats a name, keeping first-occurrence order', async () => {
+    const other: SkillItem = { ...v1, name: 'other' };
+    deps = { ...deps, source: source([v2, other]) };
+    const plan = await planInit(deps, { mcps: [], skills: ['demo', 'other', 'demo'], scope: 'user' });
+    expect(plan.skills.map((s) => s.root)).toEqual([userRoot(), join(tmp.homeDir, '.claude', 'skills', 'other')]);
+  });
+
+  it('fails planning when a listed file vanishes before it is read', async () => {
+    await put(projectRoot(), { 'SKILL.md': 'x' });
+    const fs = new NodeFileSystem();
+    deps = {
+      ...deps,
+      fs: Object.assign(Object.create(fs) as NodeFileSystem, {
+        listFiles: async (dir: string) => [...((await fs.listFiles(dir)) ?? []), 'gone.md'],
+      }),
+    };
+    await expect(planInit(deps, { mcps: [], skills: ['demo'], scope: 'project' })).rejects.toThrow(UnsafeTreeError);
+  });
+
+  it('fails planning when a listed file is swapped for a symlink before it is read', async () => {
+    await put(projectRoot(), { 'SKILL.md': 'x' });
+    await writeFile(join(tmp.root, 'secret'), 'secret');
+    const fs = new NodeFileSystem();
+    deps = {
+      ...deps,
+      fs: Object.assign(Object.create(fs) as NodeFileSystem, {
+        listFiles: async (dir: string) => {
+          const listed = await fs.listFiles(dir);
+          await rm(join(projectRoot(), 'SKILL.md'));
+          await symlink(join(tmp.root, 'secret'), join(projectRoot(), 'SKILL.md'));
+          return listed;
+        },
+      }),
+    };
+    await expect(planInit(deps, { mcps: [], skills: ['demo'], scope: 'project' })).rejects.toThrow(UnsafeTreeError);
+  });
+});
+
+describe('applyPlan (skills)', () => {
+  let tmp: TmpPaths;
+  let deps: InitDeps;
+  const skillsDir = () => join(tmp.cwd, '.claude', 'skills');
+  const root = () => join(skillsDir(), 'demo');
+  const manifest = async (): Promise<Manifest> => parseManifest(await readFile(manifestPath(tmp.homeDir), 'utf8'));
+  const readBytes = async (path: string) => new Uint8Array(await readFile(path));
+  const put = async (files: Record<string, string>) => {
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(join(root(), path, '..'), { recursive: true });
+      await writeFile(join(root(), path), text);
+    }
+  };
+  const install = (skills: string[], extra: { force?: boolean; dryRun?: boolean } = {}) =>
+    initMcps(deps, { mcps: [], skills, scope: 'project', ...extra });
+  beforeEach(async () => {
+    tmp = await makeTmpPaths();
+    deps = {
+      source: skillSource([DEMO_V1]),
+      fs: new NodeFileSystem(),
+      target: claudeCodeTarget,
+      paths: { homeDir: tmp.homeDir, cwd: tmp.cwd },
+      env: {},
+    };
+  });
+  afterEach(() => tmp.cleanup());
+
+  it('creates a skill byte-identical, binary file included, in one install record', async () => {
+    expect((await install(['demo'])).applied).toBe(true);
+    for (const f of DEMO_V1.files) expect(await readBytes(join(root(), f.path))).toEqual(f.bytes);
+    const { installs } = await manifest();
+    expect(installs).toHaveLength(1);
+    const files = installs[0]!.files;
+    expect(files.map((f) => f.path).sort()).toEqual(DEMO_V1.files.map((f) => join(root(), f.path)).sort());
+    for (const f of files) {
+      expect(f).toMatchObject({ scope: 'project', backup: null, beforeHash: null });
+      expect(f.afterHash).toBe(sha256(DEMO_V1.files.find((s) => join(root(), s.path) === f.path)!.bytes));
+      expect(f.items).toEqual([
+        { kind: 'skill', name: 'demo', action: 'create', entryHash: treeHash(DEMO_V1.files), root: root() },
+      ]);
+    }
+  });
+
+  it('records the directories it created, parents first, and none that already existed', async () => {
+    await install(['demo']);
+    expect((await manifest()).installs[0]?.createdDirs).toEqual([
+      join(tmp.cwd, '.claude'),
+      skillsDir(),
+      root(),
+      join(root(), 'assets'),
+      join(root(), 'refs'),
+    ]);
+    await mkdir(join(tmp.cwd, '.claude', 'skills', 'other'), { recursive: true });
+    deps = { ...deps, source: skillSource([{ ...DEMO_V1, name: 'second' }]) };
+    await install(['second']);
+    const dirs = (await manifest()).installs[1]?.createdDirs ?? [];
+    expect(dirs[0]).toBe(join(skillsDir(), 'second'));
+    expect(dirs).not.toContain(skillsDir());
+  });
+
+  it('writes SKILL.md last within a skill', async () => {
+    const fs = faultyFs(new NodeFileSystem(), { method: 'remove', nth: 999 });
+    deps = { ...deps, fs };
+    await install(['demo']);
+    const writes = fs.calls.filter((c) => c.startsWith('writeBytes') && c.includes(root()));
+    expect(writes).toHaveLength(4);
+    expect(writes.at(-1)).toBe(`writeBytes ${join(root(), 'SKILL.md')}`);
+  });
+
+  it('updates an owned skill: backs up old bytes first and records the dropped file with a null afterHash', async () => {
+    await install(['demo']);
+    deps = { ...deps, source: skillSource([DEMO_V2]) };
+    expect((await install(['demo'])).applied).toBe(true);
+    expect(await readFile(join(root(), 'SKILL.md'), 'utf8')).toContain('two');
+    expect(await readdir(join(root(), 'refs'))).toEqual(['a.md']);
+    const second = (await manifest()).installs[1]!;
+    expect(second.createdDirs).toEqual([]);
+    const dropped = second.files.find((f) => f.path === join(root(), 'refs', 'b.md'))!;
+    expect(dropped).toMatchObject({ afterHash: null, beforeHash: sha256('b1') });
+    expect(await readFile(join(stateDir(tmp.homeDir), dropped.backup!), 'utf8')).toBe('b1');
+    const logo = second.files.find((f) => f.path === join(root(), 'assets', 'logo.bin'))!;
+    expect(await readBytes(join(stateDir(tmp.homeDir), logo.backup!))).toEqual(DEMO_V1.files[1]!.bytes);
+  });
+
+  it('replaces a foreign directory with --force, backing every old file up', async () => {
+    await put({ 'SKILL.md': 'mine', 'notes.txt': 'keep me' });
+    const { applied } = await install(['demo'], { force: true });
+    expect(applied).toBe(true);
+    expect((await readdir(root())).sort()).toEqual(['SKILL.md', 'assets', 'refs']);
+    const files = (await manifest()).installs[0]!.files;
+    const notes = files.find((f) => f.path === join(root(), 'notes.txt'))!;
+    expect(notes).toMatchObject({ afterHash: null, beforeHash: sha256('keep me') });
+    expect(await readFile(join(stateDir(tmp.homeDir), notes.backup!), 'utf8')).toBe('keep me');
+  });
+
+  it('writes nothing for a skip, a conflict, or a dry run', async () => {
+    await put({ 'SKILL.md': 'mine' });
+    expect((await install(['demo'])).applied).toBe(false);
+    expect(await readFile(join(root(), 'SKILL.md'), 'utf8')).toBe('mine');
+    expect((await install(['demo'], { force: true, dryRun: true })).applied).toBe(false);
+    expect(await readFile(join(root(), 'SKILL.md'), 'utf8')).toBe('mine');
+    expect(await readdir(tmp.homeDir)).toEqual([]);
+    await rm(root(), { recursive: true });
+    await install(['demo']);
+    const before = await readFile(manifestPath(tmp.homeDir), 'utf8');
+    expect((await install(['demo'])).applied).toBe(false);
+    expect(await readFile(manifestPath(tmp.homeDir), 'utf8')).toBe(before);
+  });
+
+  it('records MCPs and skills in a single install', async () => {
+    deps = { ...deps, source: new FolderCatalogSource(CATALOG, 'bundled'), env: { GITHUB_TOKEN: 'abc123' } };
+    await initMcps(deps, { mcps: ['github'], skills: ['example-skill'], scope: 'project' });
+    const { installs } = await manifest();
+    expect(installs).toHaveLength(1);
+    const kinds = installs[0]!.files.map((f) => f.items[0]?.kind);
+    expect(kinds[0]).toBe('mcp');
+    expect(kinds.slice(1).every((k) => k === 'skill')).toBe(true);
+    expect(kinds.length).toBeGreaterThan(1);
+    expect(installs[0]?.createdDirs).toContain(join(tmp.cwd, '.claude', 'skills', 'example-skill'));
+  });
+
+  it('aborts with StaleFileError when the skill directory changed since planning', async () => {
+    const plan = await planInit(deps, { mcps: [], skills: ['demo'], scope: 'project' });
+    await put({ 'SKILL.md': 'appeared meanwhile' });
+    await expect(applyPlan(deps, plan)).rejects.toThrow(StaleFileError);
+    expect(await readdir(root())).toEqual(['SKILL.md']);
+    expect(await readFile(join(root(), 'SKILL.md'), 'utf8')).toBe('appeared meanwhile');
+    expect(await readdir(tmp.homeDir)).toEqual([]);
+  });
+});
+
+describe('applyPlan rollback (skills)', () => {
+  let tmp: TmpPaths;
+  let deps: InitDeps;
+  const real = new NodeFileSystem();
+  const root = () => join(tmp.cwd, '.claude', 'skills', 'demo');
+  const inRoot = (path: string) => path.startsWith(root());
+  const inState = (path: string) => path.startsWith(stateDir(tmp.homeDir));
+  const withFault = (fault: Parameters<typeof faultyFs>[1]) => {
+    const fs = faultyFs(real, fault);
+    deps = { ...deps, fs };
+    return fs;
+  };
+  const install = (extra: { force?: boolean; mcps?: string[] } = {}) =>
+    initMcps(deps, { mcps: extra.mcps ?? [], skills: ['demo'], scope: 'project', force: extra.force });
+  const tree = async (dir: string): Promise<Record<string, string>> => {
+    const out: Record<string, string> = {};
+    for (const rel of (await real.listFiles(dir)) ?? [])
+      out[rel] = Buffer.from((await real.readBytes(join(dir, rel)))!).toString('hex');
+    return out;
+  };
+  beforeEach(async () => {
+    tmp = await makeTmpPaths();
+    deps = {
+      source: skillSource([DEMO_V1]),
+      fs: real,
+      target: claudeCodeTarget,
+      paths: { homeDir: tmp.homeDir, cwd: tmp.cwd },
+      env: { GITHUB_TOKEN: 'abc123' },
+    };
+  });
+  afterEach(() => tmp.cleanup());
+
+  it('removes what it wrote, in reverse order, when the third of four writes fails', async () => {
+    const fs = withFault({ method: 'writeBytes', nth: 3, match: inRoot });
+    await expect(install()).rejects.toThrow('injected writeBytes failure');
+    const writes = fs.calls.filter((c) => c.startsWith('writeBytes') && c.includes(root()));
+    expect(writes).toHaveLength(3);
+    expect(fs.calls.filter((c) => c.startsWith('remove'))).toEqual([
+      `remove ${join(root(), 'refs', 'a.md')}`,
+      `remove ${join(root(), 'assets', 'logo.bin')}`,
+    ]);
+    expect(await readdir(tmp.cwd)).toEqual([]);
+    expect(await readdir(tmp.homeDir)).toEqual([]);
+  });
+
+  it('restores a forced replace byte-identical when the last write fails, keeping the backups', async () => {
+    await mkdir(join(root(), 'sub'), { recursive: true });
+    await writeFile(join(root(), 'SKILL.md'), 'mine');
+    await writeFile(join(root(), 'notes.txt'), 'keep me');
+    await writeFile(join(root(), 'sub', 'x.bin'), Buffer.from([0xff, 0xfe, 0x00]));
+    const original = await tree(root());
+    withFault({ method: 'writeBytes', nth: 4, match: inRoot });
+    await expect(install({ force: true })).rejects.toThrow('injected writeBytes failure');
+    expect(await tree(root())).toEqual(original);
+    expect((await readdir(root())).sort()).toEqual(['SKILL.md', 'notes.txt', 'sub']);
+    const [id] = await readdir(join(stateDir(tmp.homeDir), 'backups'));
+    expect((await readdir(join(stateDir(tmp.homeDir), 'backups', id!))).length).toBe(3);
+    await expect(readFile(manifestPath(tmp.homeDir))).rejects.toThrow();
+  });
+
+  it('touches nothing in the target when a backup write fails', async () => {
+    await mkdir(root(), { recursive: true });
+    await writeFile(join(root(), 'SKILL.md'), 'mine');
+    withFault({ method: 'writeBytes', nth: 1, match: inState });
+    await expect(install({ force: true })).rejects.toThrow('injected writeBytes failure');
+    expect(await readdir(root())).toEqual(['SKILL.md']);
+    expect(await readFile(join(root(), 'SKILL.md'), 'utf8')).toBe('mine');
+    await expect(readFile(manifestPath(tmp.homeDir))).rejects.toThrow();
+  });
+
+  it('puts an MCP config written earlier in the same install back when a skill write fails', async () => {
+    deps = {
+      ...deps,
+      source: {
+        ...skillSource([DEMO_V1]),
+        load: async () => ({ ...(await new FolderCatalogSource(CATALOG, 'bundled').load()), skills: [DEMO_V1] }),
+      },
+    };
+    const original = JSON.stringify({ theme: 'dark', mcpServers: {} });
+    await writeFile(join(tmp.cwd, '.mcp.json'), original);
+    withFault({ method: 'writeBytes', nth: 2, match: inRoot });
+    await expect(install({ mcps: ['github'] })).rejects.toThrow('injected writeBytes failure');
+    expect(await readFile(join(tmp.cwd, '.mcp.json'), 'utf8')).toBe(original);
+    expect(await readdir(tmp.cwd)).toEqual(['.mcp.json']);
+    await expect(readFile(manifestPath(tmp.homeDir))).rejects.toThrow();
+  });
+
+  it('reports an incomplete rollback and leaves an orphan directory that the next plan flags as a conflict', async () => {
+    withFault({ method: 'writeBytes', nth: 3, match: inRoot });
+    const rollbackFs = faultyFs(real, { method: 'remove', nth: 1, sticky: true });
+    deps = {
+      ...deps,
+      fs: Object.assign(Object.create(deps.fs) as typeof deps.fs, {
+        remove: (path: string) => rollbackFs.remove(path),
+      }),
+    };
+    await expect(install()).rejects.toThrow(/injected writeBytes failure.*rollback incomplete/);
+    expect(((await real.listFiles(root())) ?? []).length).toBe(2);
+    const plan = await planInit({ ...deps, fs: real }, { mcps: [], skills: ['demo'], scope: 'project' });
+    expect(plan.skills[0]).toMatchObject({ action: 'conflict' });
+  });
+
+  it('keeps rolling back the skill and reports it when restoring the MCP config also fails', async () => {
+    deps = {
+      ...deps,
+      source: {
+        ...skillSource([DEMO_V1]),
+        load: async () => ({ ...(await new FolderCatalogSource(CATALOG, 'bundled').load()), skills: [DEMO_V1] }),
+      },
+    };
+    await writeFile(join(tmp.cwd, '.mcp.json'), JSON.stringify({ mcpServers: {} }));
+    const mcpFile = join(tmp.cwd, '.mcp.json');
+    // writeAtomic 1 is the install of the config, writeAtomic 2 (sticky) its rollback restore.
+    const skillFault = faultyFs(real, { method: 'writeBytes', nth: 2, match: inRoot });
+    const mcpFault = faultyFs(real, { method: 'writeAtomic', nth: 2, sticky: true, match: (p) => p === mcpFile });
+    deps = {
+      ...deps,
+      fs: Object.assign(Object.create(real) as typeof real, {
+        writeBytes: (path: string, data: Uint8Array) => skillFault.writeBytes(path, data),
+        writeAtomic: (path: string, data: string) => mcpFault.writeAtomic(path, data),
+      }),
+    };
+    await expect(install({ mcps: ['github'] })).rejects.toThrow(/injected writeBytes failure.*rollback incomplete/);
+    expect(await readdir(join(tmp.cwd, '.claude', 'skills')).catch(() => [])).toEqual([]);
+    await expect(readFile(manifestPath(tmp.homeDir))).rejects.toThrow();
   });
 });

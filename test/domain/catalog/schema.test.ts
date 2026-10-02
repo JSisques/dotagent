@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogIndexSchema, McpItemSchema } from '@/domain/catalog/schema.js';
+import { CatalogIndexSchema, McpItemSchema, ProfileSchema } from '@/domain/catalog/schema.js';
 import { extractPlaceholders, hasPlaceholder } from '@/domain/placeholders.js';
 
 const github = {
@@ -70,10 +70,34 @@ describe('McpItemSchema', () => {
   });
 });
 
+describe('ProfileSchema', () => {
+  it('defaults skills to an empty list and accepts listed ones', () => {
+    expect(ProfileSchema.parse({ name: 'p' }).skills).toEqual([]);
+    expect(ProfileSchema.parse({ name: 'p', skills: ['demo'] }).skills).toEqual(['demo']);
+  });
+});
+
 describe('CatalogIndexSchema', () => {
   it('parses items.mcps and items.profiles', () => {
     const idx = CatalogIndexSchema.parse({ version: 1, items: { mcps: ['github'] } });
     expect(idx.items.profiles).toEqual([]);
+  });
+
+  it('defaults items.skills to an empty list when absent', () => {
+    expect(CatalogIndexSchema.parse({ version: 1, items: { mcps: [] } }).items.skills).toEqual([]);
+  });
+
+  it('parses listed skills', () => {
+    const idx = CatalogIndexSchema.parse({ version: 1, items: { mcps: [], skills: ['review-code', 'a1'] } });
+    expect(idx.items.skills).toEqual(['review-code', 'a1']);
+  });
+
+  it('rejects a skill name that could traverse paths, naming the value', () => {
+    const res = CatalogIndexSchema.safeParse({ version: 1, items: { mcps: [], skills: ['../evil'] } });
+    expect(res.success).toBe(false);
+    expect(JSON.stringify(res.error?.issues)).toContain('skills');
+    expect(res.error?.message).toContain('../evil');
+    expect(CatalogIndexSchema.safeParse({ version: 1, items: { mcps: [], skills: ['A/b'] } }).success).toBe(false);
   });
 
   it('rejects an unsupported version', () => {

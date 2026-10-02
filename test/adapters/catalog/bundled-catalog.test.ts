@@ -16,7 +16,19 @@ describe('bundled catalog', () => {
         'web',
         catalog.profiles,
         catalog.mcps.map((m) => m.name),
+        catalog.skills.map((sk) => sk.name),
       ),
-    ).toEqual(['context7', 'github']);
+    ).toEqual({ mcps: ['context7', 'github'], skills: [] });
+  });
+
+  it('loads the bundled example skill with its frontmatter', async () => {
+    const catalog = await new FolderCatalogSource(
+      join(import.meta.dirname, '..', '..', '..', 'catalog'),
+      'bundled',
+    ).load();
+    expect(catalog.skills).toHaveLength(1);
+    expect(catalog.skills[0]).toMatchObject({ name: 'example-skill' });
+    expect(catalog.skills[0]?.description).toContain('example skill');
+    expect(catalog.skills[0]?.files.map((f) => f.path)).toEqual(['SKILL.md']);
   });
 });

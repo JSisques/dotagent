@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SkillNameSchema, type SkillItem } from '@/domain/catalog/skill.js';
 import { extractPlaceholders, hasPlaceholder } from '@/domain/placeholders.js';
 
 const VarName = /^[A-Z_][A-Z0-9_]*$/;
@@ -60,11 +61,16 @@ export const ProfileSchema = z.object({
   description: z.string().optional(),
   extends: z.array(z.string()).default([]),
   mcps: z.array(z.string()).default([]),
+  skills: z.array(z.string()).default([]),
 });
 
 export const CatalogIndexSchema = z.object({
   version: z.literal(1),
-  items: z.looseObject({ mcps: z.array(z.string()), profiles: z.array(z.string()).default([]) }),
+  items: z.looseObject({
+    mcps: z.array(z.string()),
+    profiles: z.array(z.string()).default([]),
+    skills: z.array(SkillNameSchema).default([]),
+  }),
 });
 
 export type McpItem = z.infer<typeof McpItemSchema>;
@@ -73,5 +79,6 @@ export type CatalogIndex = z.infer<typeof CatalogIndexSchema>;
 
 export interface Catalog {
   mcps: McpItem[];
+  skills: SkillItem[];
   profiles: Profile[];
 }
