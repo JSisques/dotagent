@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { sha256 } from '../../src/domain/hash.js';
-import { ConfigError, detectIndent, mergeAtPath, readAtPath } from '../../src/domain/json-merge.js';
+import { sha256 } from '@/domain/hash.js';
+import { ConfigError, detectIndent, mergeAtPath, readAtPath } from '@/domain/json-merge.js';
 
 const KEY = ['mcpServers'];
 

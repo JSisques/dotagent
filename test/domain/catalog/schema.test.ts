@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogIndexSchema, McpItemSchema } from '../../../src/domain/catalog/schema.js';
-import { extractPlaceholders, hasPlaceholder } from '../../../src/domain/placeholders.js';
+import { CatalogIndexSchema, McpItemSchema } from '@/domain/catalog/schema.js';
+import { extractPlaceholders, hasPlaceholder } from '@/domain/placeholders.js';
 
 const github = {
   name: 'github',

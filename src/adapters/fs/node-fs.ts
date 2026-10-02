@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import type { FileSystem } from '../../ports/file-system.js';
+import type { FileSystem } from '@/ports/file-system.js';
 
 const isMissing = (e: unknown): boolean => (e as NodeJS.ErrnoException).code === 'ENOENT';
 

@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ZodType } from 'zod';
-import { resolveProfile } from '../../domain/catalog/profile.js';
-import { CatalogIndexSchema, McpItemSchema, ProfileSchema } from '../../domain/catalog/schema.js';
-import type { McpItem, Profile } from '../../domain/catalog/schema.js';
-import type { CatalogIssue, CatalogSource, LoadedCatalog, SourceRef } from '../../ports/catalog-source.js';
+import { resolveProfile } from '@/domain/catalog/profile.js';
+import { CatalogIndexSchema, McpItemSchema, ProfileSchema } from '@/domain/catalog/schema.js';
+import type { McpItem, Profile } from '@/domain/catalog/schema.js';
+import type { CatalogIssue, CatalogSource, LoadedCatalog, SourceRef } from '@/ports/catalog-source.js';
 
 /** Reads a catalog folder. The bundled catalog is just a folder resolved by the composition root. */
 export class FolderCatalogSource implements CatalogSource {

@@ -1,5 +1,5 @@
-import { emptyManifest, parseManifest, type Install, type Manifest } from '../domain/manifest.js';
-import type { FileSystem } from '../ports/file-system.js';
+import { emptyManifest, parseManifest, type Install, type Manifest } from '@/domain/manifest.js';
+import type { FileSystem } from '@/ports/file-system.js';
 
 /** Where dotagent keeps its manifest and backups; one location for both scopes. */
 export const stateDir = (homeDir: string): string => `${homeDir}/.claude/.dotagent`;

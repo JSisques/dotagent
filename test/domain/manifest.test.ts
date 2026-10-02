@@ -6,7 +6,7 @@ import {
   parseManifest,
   type Install,
   type Manifest,
-} from '../../src/domain/manifest.js';
+} from '@/domain/manifest.js';
 
 const install = (id: string, name: string, entryHash: string, over: Partial<Install> = {}): Install => ({
   id,

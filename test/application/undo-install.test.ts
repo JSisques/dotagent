@@ -1,13 +1,13 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FolderCatalogSource } from '../../src/adapters/catalog/folder-source.js';
-import { claudeCodeTarget } from '../../src/adapters/claude-code/target.js';
-import { NodeFileSystem } from '../../src/adapters/fs/node-fs.js';
-import { initMcps, type InitDeps } from '../../src/application/init-mcps.js';
-import { loadManifest, manifestPath } from '../../src/application/journal.js';
-import { UndoSelectionError, undoInstall } from '../../src/application/undo-install.js';
-import { makeTmpPaths, type TmpPaths } from '../helpers/tmp-paths.js';
+import { FolderCatalogSource } from '@/adapters/catalog/folder-source.js';
+import { claudeCodeTarget } from '@/adapters/claude-code/target.js';
+import { NodeFileSystem } from '@/adapters/fs/node-fs.js';
+import { initMcps, type InitDeps } from '@/application/init-mcps.js';
+import { loadManifest, manifestPath } from '@/application/journal.js';
+import { UndoSelectionError, undoInstall } from '@/application/undo-install.js';
+import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 const CATALOG = join(import.meta.dirname, '..', '..', 'catalog');
 

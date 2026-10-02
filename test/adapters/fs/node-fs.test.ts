@@ -1,8 +1,8 @@
 import { chmod, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { NodeFileSystem } from '../../../src/adapters/fs/node-fs.js';
-import { makeTmpPaths, type TmpPaths } from '../../helpers/tmp-paths.js';
+import { NodeFileSystem } from '@/adapters/fs/node-fs.js';
+import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 describe('NodeFileSystem', () => {
   let tmp: TmpPaths;
