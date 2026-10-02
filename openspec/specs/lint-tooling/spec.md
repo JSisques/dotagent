@@ -40,7 +40,8 @@ The system MUST lint `src/` and `test/` with typescript-eslint `recommendedTypeC
 
 ### Requirement: Scoped overrides and ignores
 
-Test files MAY have rules relaxed only where justified. `scripts/*.mjs` and `eslint.config.js` MUST be linted without type information and with Node globals. `dist`, `coverage`, `node_modules`, `openspec` and `test/fixtures/lint` MUST be ignored.
+Test files MAY have rules relaxed only where justified. `scripts/*.mjs` and `eslint.config.js` MUST be linted without type information and with Node globals. `dist`, `coverage`, `node_modules`, `openspec`, `test/fixtures/lint` and `CHANGELOG.md` MUST be ignored.
+(Previously: ignore list lacked `CHANGELOG.md`.)
 
 #### Scenario: Plain-JS scripts
 
@@ -53,6 +54,12 @@ Test files MAY have rules relaxed only where justified. `scripts/*.mjs` and `esl
 - GIVEN a violating file exists under `dist/`
 - WHEN `pnpm lint` runs
 - THEN the file is not reported
+
+#### Scenario: Changelog ignored
+
+- GIVEN a generated `CHANGELOG.md` exists
+- WHEN `pnpm lint` runs
+- THEN it is not linted and the run exits 0
 
 ### Requirement: Justified disables
 
