@@ -70,3 +70,8 @@ export const CatalogIndexSchema = z.object({
 export type McpItem = z.infer<typeof McpItemSchema>;
 export type Profile = z.infer<typeof ProfileSchema>;
 export type CatalogIndex = z.infer<typeof CatalogIndexSchema>;
+
+export interface Catalog {
+  mcps: McpItem[];
+  profiles: Profile[];
+}
