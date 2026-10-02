@@ -10,17 +10,18 @@ Requirements: Node `>=22.13` (`engines`; `.nvmrc` pins 22.22.1, which CI uses, a
 pnpm install
 ```
 
-| Command                 | What it does                                       |
-| ----------------------- | -------------------------------------------------- |
-| `pnpm run typecheck`    | Type-check without emitting                        |
-| `pnpm run lint`         | ESLint (typescript-eslint, type-aware)             |
-| `pnpm run lint:fix`     | ESLint with autofixes                              |
-| `pnpm test`             | Run all tests (Vitest)                             |
-| `pnpm run test:changed` | Only tests affected vs `origin/main`               |
-| `pnpm run build`        | Compile to `dist/` and check the path aliases      |
-| `pnpm run format`       | Rewrite files with Prettier                        |
-| `pnpm run format:check` | Fail if any file is not formatted                  |
-| `pnpm run smoke:pack`   | Pack and install the package like a consumer would |
+| Command                  | What it does                                       |
+| ------------------------ | -------------------------------------------------- |
+| `pnpm run typecheck`     | Type-check without emitting                        |
+| `pnpm run lint`          | ESLint (typescript-eslint, type-aware)             |
+| `pnpm run lint:fix`      | ESLint with autofixes                              |
+| `pnpm test`              | Run all tests (Vitest)                             |
+| `pnpm run test:changed`  | Only tests affected vs `origin/main`               |
+| `pnpm run test:coverage` | Run tests with coverage (minimum 80%)              |
+| `pnpm run build`         | Compile to `dist/` and check the path aliases      |
+| `pnpm run format`        | Rewrite files with Prettier                        |
+| `pnpm run format:check`  | Fail if any file is not formatted                  |
+| `pnpm run smoke:pack`    | Pack and install the package like a consumer would |
 
 Run the built CLI with `node dist/main.js init --dry-run ...` (after `pnpm run build`). Tests never touch your real home directory; see `test/setup.ts`.
 
@@ -136,5 +137,5 @@ Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `buil
 - Open the PR against `main`. Link the issue it closes (`Closes #<n>`).
 - Keep it small and focused on one change. Split unrelated work into separate PRs. There is no hard size limit, but smaller PRs get reviewed faster.
 - Add or update tests with the code, and update the README when behavior changes.
-- CI (`.github/workflows/ci.yml`, job `ci`) must pass. It runs, in order: `pnpm install --frozen-lockfile`, `pnpm run lint`, `pnpm run format:check`, `pnpm run typecheck`, `pnpm test`, `pnpm run build`, `pnpm run smoke:pack`. Run them locally before pushing.
+- CI (`.github/workflows/ci.yml`, job `ci`) must pass. It runs, in order: `pnpm install --frozen-lockfile`, `pnpm run lint`, `pnpm run format:check`, `pnpm run docs:catalog:check`, `pnpm run typecheck`, `pnpm run test:coverage` (fails below 80% coverage), `pnpm run build`, `pnpm run smoke:pack`. Run them locally before pushing.
 - `smoke:pack` (`scripts/smoke-pack.mjs`) intentionally uses `npm pack` and `npm install`, because it simulates how consumers install the published package.
