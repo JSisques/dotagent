@@ -1,0 +1,9 @@
+{
+  "name": "context7",
+  "description": "Up-to-date library documentation for coding agents",
+  "server": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@upstash/context7-mcp"]
+  }
+}
