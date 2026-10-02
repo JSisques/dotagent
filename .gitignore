@@ -14,3 +14,5 @@ coverage/
 
 # Environment variables
 .env
+# Claude Code worktrees
+.claude/worktrees/
