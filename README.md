@@ -43,6 +43,8 @@ npm install
 npm run typecheck
 npm test
 npm run build
+npm run format        # rewrite files with Prettier
+npm run format:check  # fail if any file is not formatted
 ```
 
 Tests never touch the real home directory; see `test/setup.ts`.

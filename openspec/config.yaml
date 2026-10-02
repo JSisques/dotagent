@@ -21,7 +21,7 @@ testing:
   coverage: false
   linter: null
   type_checker: null
-  formatter: null
+  formatter: prettier
 rules:
   proposal:
     - Include rollback plan and affected hexagonal layers
