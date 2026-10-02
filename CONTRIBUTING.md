@@ -1,0 +1,138 @@
+# Contributing to shitaku
+
+Thanks for helping. This guide covers local setup, adding catalog items (MCPs, skills, profiles), commit conventions and what a pull request needs to pass.
+
+## Local setup
+
+Requirements: Node `>=22.13` (`engines`; `.nvmrc` pins 22.22.1, which CI uses, and `nvm use` reads it) and pnpm. The pnpm version is pinned in the `packageManager` field of `package.json`. Run `corepack enable` once so it is used automatically (Node 25+ no longer bundles Corepack: run `npm i -g corepack` first). Without Corepack, `npm i -g pnpm@10` also works. `npm install` is not supported for development.
+
+```sh
+pnpm install
+```
+
+| Command                 | What it does                                       |
+| ----------------------- | -------------------------------------------------- |
+| `pnpm run typecheck`    | Type-check without emitting                        |
+| `pnpm run lint`         | ESLint (typescript-eslint, type-aware)             |
+| `pnpm run lint:fix`     | ESLint with autofixes                              |
+| `pnpm test`             | Run all tests (Vitest)                             |
+| `pnpm run test:changed` | Only tests affected vs `origin/main`               |
+| `pnpm run build`        | Compile to `dist/` and check the path aliases      |
+| `pnpm run format`       | Rewrite files with Prettier                        |
+| `pnpm run format:check` | Fail if any file is not formatted                  |
+| `pnpm run smoke:pack`   | Pack and install the package like a consumer would |
+
+Run the built CLI with `node dist/main.js init --dry-run ...` (after `pnpm run build`). Tests never touch your real home directory; see `test/setup.ts`.
+
+### Git hooks
+
+`pnpm install` installs Husky hooks:
+
+| Hook         | Runs                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `pre-commit` | ESLint then Prettier on staged `ts`/`mjs`/`js` files, Prettier on the rest (lint-staged) |
+| `commit-msg` | commitlint with Conventional Commits                                                     |
+| `pre-push`   | `pnpm run typecheck`, `pnpm run test:changed`, `pnpm run build`                          |
+
+Bypass with `git commit --no-verify`, `git push --no-verify` or `HUSKY=0`. CI runs the same checks, so bypassing only delays the failure.
+
+## Adding to the catalog
+
+The catalog lives in `catalog/`:
+
+```
+catalog/
+  catalog.json        index: lists every item by name
+  mcps/<name>.json
+  profiles/<name>.json
+  skills/<name>/SKILL.md
+```
+
+Every item must be listed in `catalog/catalog.json` under `items.mcps`, `items.profiles` or `items.skills`. The loader (`src/adapters/catalog/folder-source.ts`) validates items with the zod schemas in `src/domain/catalog/`. An invalid or unlisted item is skipped with a warning.
+
+Names for MCPs and skills must match `^[a-z0-9][a-z0-9-]*$` (lowercase letters, digits and hyphens; no leading hyphen).
+
+### Add a skill
+
+1. Create `catalog/skills/<name>/SKILL.md`. Add any supporting files (scripts, templates, assets) next to it in the same directory.
+2. Start `SKILL.md` with frontmatter:
+
+   ```md
+   ---
+   name: my-skill
+   description: One line that says what the skill does and when to use it.
+   ---
+
+   # My skill
+
+   Instructions for the agent.
+   ```
+
+   - `name` must equal the directory name and match the naming rule.
+   - `description` is required and non-empty.
+   - Only single-line `key: value` frontmatter is supported. Multi-line values (indented lines, `|`, `>`) are rejected.
+   - No symlinks. Limits: 100 files, depth 8, 1 MiB per file, 5 MiB per skill.
+
+3. Add the name to `items.skills` in `catalog/catalog.json`:
+
+   ```json
+   "skills": ["example-skill", "my-skill"]
+   ```
+
+4. Update `test/adapters/catalog/bundled-catalog.test.ts`, which asserts the exact bundled item lists and counts.
+5. Verify:
+
+   ```sh
+   pnpm run build
+   node dist/main.js init --skills my-skill --scope project --dry-run
+   pnpm test
+   ```
+
+   The dry run prints `my-skill: create` and writes nothing. If the output says `not listed in catalog.json` or `unknown skill`, check step 3. `catalog/skills/example-skill` is a reference.
+
+### Add an MCP
+
+1. Create `catalog/mcps/<name>.json`. The `name` field must equal the file name and match the naming rule.
+2. Fields:
+   - `name`, `description`: required strings.
+   - `server`: either `{ "type": "stdio", "command": "...", "args": [...], "env": {...} }` or `{ "type": "http" | "sse", "url": "https://...", "headers": {...} }`.
+   - `env`: list of `{ "name": "UPPER_SNAKE", "required": true, "description": "..." }` for every variable the server references. `required` defaults to `true`.
+   - `targets`: optional list of agent targets; omit it for all (the only target today is `claude-code`).
+3. Secrets: values in `headers` and `server.env` must reference a `${VAR}` placeholder; literal values are rejected. Every `${VAR}` used anywhere in the server definition must be declared in `env`. Defaults (`${VAR:-x}`) are not allowed in headers. Never commit a real token.
+4. Add the name to `items.mcps` in `catalog/catalog.json`, then update `test/adapters/catalog/bundled-catalog.test.ts`.
+5. Verify with `pnpm run build`, `node dist/main.js init --mcps <name> --scope project --dry-run` and `pnpm test`.
+
+Examples: `catalog/mcps/github.json` (http with a secret header) and `catalog/mcps/context7.json` (stdio).
+
+### Add a profile
+
+A profile is a named bundle of MCPs and skills.
+
+1. Create `catalog/profiles/<name>.json`. The `name` field must equal the file name.
+2. Fields: `name` (required), `description`, `extends` (profile names, applied first), `mcps`, `skills` (names that exist in the catalog).
+3. Every referenced MCP, skill and parent profile must exist, and `extends` must not form a cycle. A profile that does not resolve is skipped with a warning.
+4. Add the name to `items.profiles` in `catalog/catalog.json`, then update `test/adapters/catalog/bundled-catalog.test.ts` if needed.
+
+The CLI cannot select a profile yet; profiles are validated and resolved but not installable by name.
+
+To try an item without touching the bundled catalog, point the CLI at another folder: `--source <folder>`.
+
+## Commits
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`@commitlint/config-conventional`, enforced by the `commit-msg` hook), for example:
+
+```
+feat: add skills catalog loader
+fix: reject skill names that escape the directory
+docs: add CONTRIBUTING guide
+```
+
+Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+
+## Pull requests
+
+- Open the PR against `main`. Link the issue it closes (`Closes #<n>`).
+- Keep it small and focused on one change. Split unrelated work into separate PRs. There is no hard size limit, but smaller PRs get reviewed faster.
+- Add or update tests with the code, and update the README when behavior changes.
+- CI (`.github/workflows/ci.yml`, job `ci`) must pass. It runs, in order: `pnpm install --frozen-lockfile`, `pnpm run lint`, `pnpm run format:check`, `pnpm run typecheck`, `pnpm test`, `pnpm run build`, `pnpm run smoke:pack`. Run them locally before pushing.
+- `smoke:pack` (`scripts/smoke-pack.mjs`) intentionally uses `npm pack` and `npm install`, because it simulates how consumers install the published package.

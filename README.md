@@ -58,6 +58,8 @@ Whether `${VAR}` placeholders are expanded in user-scope `~/.claude.json` entrie
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide (setup, adding catalog items, commits, PRs).
+
 ```sh
 pnpm install
 pnpm run typecheck
