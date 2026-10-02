@@ -40,7 +40,7 @@ describe('McpItemSchema', () => {
   });
 
   it('rejects an item without server', () => {
-    const { server: _server, ...bad } = github;
+    const bad = { ...github, server: undefined };
     const res = McpItemSchema.safeParse(bad);
     expect(res.success).toBe(false);
     expect(JSON.stringify(res.error?.issues)).toContain('server');

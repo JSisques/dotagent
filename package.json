@@ -16,14 +16,16 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/check-dist-aliases.mjs",
-    "typecheck": "tsc --noEmit",
+    "build": "node node_modules/typescript-native/bin/tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/check-dist-aliases.mjs",
+    "typecheck": "node node_modules/typescript-native/bin/tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -40,16 +42,26 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.4",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",
     "tsc-alias": "^1.9.7",
-    "typescript": "^7.0.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "typescript-native": "npm:typescript@^7.0.2",
     "vitest": "^5.0.3"
   },
   "lint-staged": {
-    "*": "prettier --write --ignore-unknown"
+    "*.{ts,mjs,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "!(*.{ts,mjs,js})": "prettier --write --ignore-unknown"
   },
   "packageManager": "pnpm@10.34.6+sha512.7e1ae66a83a9143c118cc1944f37cc4f2b8acddeda4b001cfa78908f6e46e45e15292739ca6c9d026426cc757e9318cc98c5551d6a16c165097b0028ba87b4e6"
 }

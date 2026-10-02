@@ -3,6 +3,7 @@ import { claudeCodeTarget as target } from '@/adapters/claude-code/target.js';
 import { McpItemSchema } from '@/domain/catalog/schema.js';
 import { ConfigError } from '@/domain/json-merge.js';
 import { buildPlan } from '@/domain/plan/change-plan.js';
+import { parseDoc } from '@test/helpers/parse-doc.js';
 
 const github = McpItemSchema.parse({
   name: 'github',
@@ -20,7 +21,7 @@ describe('buildPlan', () => {
     expect(files).toHaveLength(1);
     expect(files[0]).toMatchObject({ path: '/w/.mcp.json', scope: 'project', beforeHash: null, before: null });
     expect(files[0]?.items[0]).toMatchObject({ name: 'github', action: 'create' });
-    expect(JSON.parse(files[0]?.after ?? '').mcpServers.github.headers.Authorization).toBe('Bearer ${GITHUB_TOKEN}');
+    expect(parseDoc(files[0]?.after ?? '').mcpServers.github?.headers?.Authorization).toBe('Bearer ${GITHUB_TOKEN}');
   });
 
   it('skips an identical entry regardless of key order and leaves the file untouched', () => {
@@ -43,7 +44,7 @@ describe('buildPlan', () => {
     const before = JSON.stringify({ mcpServers: { github: { type: 'stdio', command: 'x' } } });
     const file = plan(before, {}, true).files[0];
     expect(file?.items[0]).toMatchObject({ action: 'update' });
-    expect(JSON.parse(file?.after ?? '').mcpServers.github.type).toBe('http');
+    expect(parseDoc(file?.after ?? '').mcpServers.github?.type).toBe('http');
   });
 
   it('reports env var status without exposing values', () => {
@@ -56,6 +57,7 @@ describe('buildPlan', () => {
   it('marks items the target does not support as skipped', () => {
     const other = { ...github, targets: ['cursor'] };
     const { files } = buildPlan({ items: [other], target, scope: 'project', paths, existing: null, env: {} });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest asymmetric matchers are typed any
     expect(files[0]?.items[0]).toMatchObject({ action: 'skip', reason: expect.stringContaining('claude-code') });
   });
 

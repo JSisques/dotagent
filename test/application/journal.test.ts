@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NodeFileSystem } from '@/adapters/fs/node-fs.js';
 import { appendInstall, loadManifest, manifestPath, stateDir } from '@/application/journal.js';
-import { ManifestError, type Install } from '@/domain/manifest.js';
+import { ManifestError, parseManifest, type Install } from '@/domain/manifest.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 const install = (id: string): Install => ({
@@ -40,16 +40,16 @@ describe('journal', () => {
     expect(await loadManifest(fs, tmp.homeDir)).toEqual({ version: 1, installs: [] });
     await appendInstall(fs, tmp.homeDir, install('a'));
 
-    const saved = JSON.parse(await readFile(manifestPath(tmp.homeDir), 'utf8'));
-    expect(saved.installs.map((i: Install) => i.id)).toEqual(['a']);
+    const saved = parseManifest(await readFile(manifestPath(tmp.homeDir), 'utf8'));
+    expect(saved.installs.map((i) => i.id)).toEqual(['a']);
     expect(await readFile(legacyManifest, 'utf8')).toBe(legacyText);
   });
 
   it('writes the manifest on the first install and appends afterwards', async () => {
     await appendInstall(fs, tmp.homeDir, install('a'));
     await appendInstall(fs, tmp.homeDir, install('b'));
-    const saved = JSON.parse(await readFile(manifestPath(tmp.homeDir), 'utf8'));
-    expect(saved.installs.map((i: Install) => i.id)).toEqual(['a', 'b']);
+    const saved = parseManifest(await readFile(manifestPath(tmp.homeDir), 'utf8'));
+    expect(saved.installs.map((i) => i.id)).toEqual(['a', 'b']);
   });
 
   it('refuses to overwrite a corrupt manifest', async () => {
