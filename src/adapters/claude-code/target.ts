@@ -1,0 +1,23 @@
+import { join } from 'node:path';
+import type { McpItem } from '../../domain/catalog/schema.js';
+import type { AgentTarget, McpServerEntry } from '../../ports/agent-target.js';
+
+export const claudeCodeTarget: AgentTarget = {
+  id: 'claude-code',
+
+  supports: (item: McpItem) => item.targets === undefined || item.targets.includes('claude-code'),
+
+  configPath(scope, paths) {
+    if (scope === 'user') throw new Error('user scope is not implemented yet');
+    return join(paths.cwd, '.mcp.json');
+  },
+
+  serversKeyPath: () => ['mcpServers'],
+
+  toEntry({ server }: McpItem): McpServerEntry {
+    if (server.type === 'stdio') {
+      return { type: 'stdio', command: server.command, args: server.args, ...(server.env && { env: server.env }) };
+    }
+    return { type: server.type, url: server.url, ...(server.headers && { headers: server.headers }) };
+  },
+};
