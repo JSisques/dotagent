@@ -1,6 +1,76 @@
 # shitaku
 
-Portable, configurable AI agent setup (skills, MCPs, etc.) installable via `npx @jsisques/shitaku`.
+> Install a curated AI agent setup (MCP servers and skills) for Claude Code with one command.
+
+<!--
+  Badges that are intentionally NOT here yet (add them when their dependency lands):
+  TODO(npm publish): npm version and npm downloads badges (shields.io/npm/v and /npm/dm for @jsisques/shitaku).
+  TODO(website): website badge/link once the docs site exists.
+-->
+
+[![CI](https://github.com/JSisques/shitaku/actions/workflows/ci.yml/badge.svg)](https://github.com/JSisques/shitaku/actions/workflows/ci.yml)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.13-339933?logo=node.js&logoColor=white)](package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+<!--
+  TODO(demo): add a GIF or screenshot of `shitaku init` running here, e.g.
+  ![shitaku init demo](docs/assets/demo.gif)
+  Not recorded yet; do not embed a path that does not exist.
+-->
+
+## Quickstart
+
+```sh
+# 1. Pick MCPs and skills interactively and review the plan
+npx @jsisques/shitaku init
+
+# 2. Or install without prompts
+npx @jsisques/shitaku init --mcps github,context7 --scope project --yes
+
+# 3. Changed your mind? Restore the files changed by the last install
+npx @jsisques/shitaku undo
+```
+
+Requires Node `>=22.13`. After a global install the command is just `shitaku`.
+
+## Table of contents
+
+- [Quickstart](#quickstart)
+- [Why shitaku](#why-shitaku)
+- [Catalog](#catalog)
+- [Usage](#usage)
+- [Custom catalogs and trust](#custom-catalogs-and-trust)
+- [Known limitation](#known-limitation)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Development](#development)
+
+## Why shitaku
+
+Setting up an AI coding agent means hand-editing config files (`.mcp.json`, `~/.claude.json`, `~/.claude/skills/`) and repeating that on every machine and project. shitaku makes that setup portable and repeatable:
+
+- **One command** installs MCP servers and skills from a curated catalog, at project or user scope.
+- **Safe by default**: `--dry-run` previews the plan, conflicting entries are never overwritten silently, and secrets are written only as `${VAR}` placeholders, never as values.
+- **Reversible**: every change is backed up and recorded, so `shitaku undo` restores the previous state.
+- **Extensible**: point `--source` at your own catalog folder.
+
+## Catalog
+
+The bundled catalog lives in [`catalog/`](catalog/).
+
+### MCP servers
+
+| Name       | Description                                                    |
+| ---------- | -------------------------------------------------------------- |
+| `context7` | Up-to-date library documentation for coding agents             |
+| `github`   | GitHub remote MCP server (repositories, issues, pull requests) |
+
+### Skills
+
+| Name            | Description                                                |
+| --------------- | ---------------------------------------------------------- |
+| `example-skill` | Minimal example skill that shows the catalog skill layout. |
 
 ## Usage
 
@@ -55,6 +125,14 @@ Limits: skills are copied as plain files, so shitaku does not run, lint or sandb
 ### Known limitation
 
 Whether `${VAR}` placeholders are expanded in user-scope `~/.claude.json` entries is unverified. For entries with env placeholders (for example `github`), prefer project scope (`.mcp.json`).
+
+## Roadmap
+
+Planned work and open ideas are tracked as [GitHub issues](https://github.com/JSisques/shitaku/issues).
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Development
 
