@@ -16,7 +16,7 @@ semantic-release needs a previous release tag, and npm OIDC needs the package to
 1. Open a PR `chore(release): 0.1.0` that only sets `version` to `0.1.0` in `package.json`, and merge it.
 2. On that `main` commit run `pnpm install --frozen-lockfile`, `npm login`, then `npm publish` (needs 2FA).
 3. Tag that exact commit and push the tag: `git tag v0.1.0 <sha>` then `git push origin v0.1.0`. The tag MUST be reachable from `main`; otherwise semantic-release finds no tag and computes `1.0.0` from the full history.
-4. On npmjs.com, open the package settings and add a Trusted Publisher: provider GitHub Actions, owner `JSisques`, repository `shitaku` (`JSisques/shitaku`), workflow filename `cd.yml`, environment empty.
+4. On npmjs.com, open the package settings and add a Trusted Publisher: provider GitHub Actions, owner `JSisques`, repository `shitaku` (`JSisques/shitaku`), workflow filename `cd.yml`, environment empty. Under "Allowed actions", check **Allow npm publish** (`npm stage publish` is always allowed, but the release job publishes directly); leave "Allow npm dist-tag" unchecked.
 
 Never rename `cd.yml`: the trusted publisher is bound to that filename, and the publish runs inside it. Renaming it breaks npm publishing until the trusted publisher is updated.
 
