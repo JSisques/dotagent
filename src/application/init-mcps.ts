@@ -1,13 +1,16 @@
 import { randomBytes } from 'node:crypto';
 import { basename } from 'node:path';
 import { hashEntry, sha256 } from '@/domain/hash.js';
-import type { Install } from '@/domain/manifest.js';
-import { deriveOwnership } from '@/domain/manifest.js';
+import type { McpItem } from '@/domain/catalog/schema.js';
+import type { Install, Manifest } from '@/domain/manifest.js';
+import { deriveOwnership, deriveSkillOwnership } from '@/domain/manifest.js';
+import type { SkillFile } from '@/domain/catalog/skill.js';
+import { buildSkillPlan, type SkillPlanEntry } from '@/domain/plan/skill-plan.js';
 import { buildPlan, replanFile, writesFile } from '@/domain/plan/change-plan.js';
 import type { ChangePlan, FileChange } from '@/domain/plan/change-plan.js';
 import type { AgentTarget, Scope } from '@/ports/agent-target.js';
 import type { CatalogSource } from '@/ports/catalog-source.js';
-import type { FileSystem } from '@/ports/file-system.js';
+import { UnsafeTreeError, type FileSystem } from '@/ports/file-system.js';
 import type { Paths } from '@/ports/paths.js';
 import { appendInstall, loadManifest, stateDir } from './journal.js';
 
@@ -24,25 +27,69 @@ export interface InitDeps {
 
 export interface InitRequest {
   mcps: string[];
+  /** Skill names to install; defaults to none. */
+  skills?: string[];
   scope: Scope;
   force?: boolean;
   dryRun?: boolean;
 }
 
 export class UnknownMcpError extends Error {}
+export class UnknownSkillError extends Error {}
 /** The target changed between planning and applying in a way that alters the plan. */
 export class StaleFileError extends Error {}
 /** A resolved env value would be written to disk. */
 export class LeakError extends Error {}
 
+/** Reads the files at a skill directory; null when it does not exist. Throws UnsafeTreeError on a symlink or a file that vanishes mid-read. */
+async function readPresent(fs: FileSystem, root: string): Promise<SkillFile[] | null> {
+  const paths = await fs.listFiles(root);
+  if (paths === null) return null;
+  const files: SkillFile[] = [];
+  for (const path of paths) {
+    const bytes = await fs.readBytes(`${root}/${path}`);
+    if (bytes === null) throw new UnsafeTreeError(`file vanished while reading: ${root}/${path}`);
+    files.push({ path, bytes });
+  }
+  return files;
+}
+
 export async function planInit(deps: InitDeps, req: InitRequest): Promise<ChangePlan> {
   const catalog = await deps.source.load();
   const unknown = req.mcps.filter((name) => !catalog.mcps.some((m) => m.name === name));
   if (unknown.length > 0) throw new UnknownMcpError(`unknown MCP: ${unknown.join(', ')}`);
-  const items = req.mcps.map((name) => catalog.mcps.find((m) => m.name === name)!);
+  const skillNames = [...new Set(req.skills ?? [])];
+  const unknownSkills = skillNames.filter((name) => !catalog.skills.some((sk) => sk.name === name));
+  if (unknownSkills.length > 0) throw new UnknownSkillError(`unknown skill: ${unknownSkills.join(', ')}`);
+
+  const manifest = await loadManifest(deps.fs, deps.paths.homeDir);
+  const mcpPlan = await planMcps(deps, req, catalog.mcps, manifest);
+  const skillsDir = deps.target.skillsDir(req.scope, deps.paths);
+  const entries: SkillPlanEntry[] = [];
+  for (const name of skillNames) {
+    const root = `${skillsDir}/${name}`;
+    entries.push({
+      skill: catalog.skills.find((sk) => sk.name === name)!,
+      root,
+      present: await readPresent(deps.fs, root),
+    });
+  }
+  return {
+    ...mcpPlan,
+    skills: buildSkillPlan({ skills: entries, owned: deriveSkillOwnership(manifest), force: req.force }),
+  };
+}
+
+async function planMcps(
+  deps: InitDeps,
+  req: InitRequest,
+  catalogMcps: McpItem[],
+  manifest: Manifest,
+): Promise<ChangePlan> {
+  if (req.mcps.length === 0) return { files: [], requiredEnv: [], declaredEnv: [], skills: [] };
+  const items = req.mcps.map((name) => catalogMcps.find((m) => m.name === name)!);
   const path = deps.target.configPath(req.scope, deps.paths);
   const existing = await deps.fs.readText(path);
-  const owned = deriveOwnership(await loadManifest(deps.fs, deps.paths.homeDir))[path] ?? {};
   return buildPlan({
     items,
     target: deps.target,
@@ -51,7 +98,7 @@ export async function planInit(deps: InitDeps, req: InitRequest): Promise<Change
     existing,
     env: deps.env,
     force: req.force,
-    owned,
+    owned: deriveOwnership(manifest)[path] ?? {},
   });
 }
 
@@ -118,6 +165,7 @@ export async function applyPlan(deps: InitDeps, plan: ChangePlan, opts: { force?
     undoneAt: null,
     source: { ...source, catalogVersion: 1 },
     files: installed,
+    createdDirs: [],
   });
   return true;
 }

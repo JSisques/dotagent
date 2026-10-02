@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, rm, rmdir, stat } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import { listTree } from '@/adapters/fs/walk.js';
+import { listTree, readFileNoFollow } from '@/adapters/fs/walk.js';
 import type { FileSystem } from '@/ports/file-system.js';
 
 const isMissing = (e: unknown): boolean => (e as NodeJS.ErrnoException).code === 'ENOENT';
@@ -17,12 +17,7 @@ export class NodeFileSystem implements FileSystem {
   }
 
   async readBytes(path: string): Promise<Uint8Array | null> {
-    try {
-      return new Uint8Array(await readFile(path));
-    } catch (e) {
-      if (isMissing(e)) return null;
-      throw e;
-    }
+    return readFileNoFollow(path, path);
   }
 
   listFiles(dir: string): Promise<string[] | null> {
@@ -30,17 +25,26 @@ export class NodeFileSystem implements FileSystem {
   }
 
   async writeAtomic(path: string, data: string): Promise<void> {
-    const dir = dirname(path);
-    await this.mkdirp(dir);
     const mode = await stat(path).then(
       (s) => s.mode & 0o777,
       () => 0o644,
     );
+    await this.writeViaTemp(path, data, mode);
+  }
+
+  /** Same temp-file-and-rename as writeAtomic, with a fixed mode of 0644. */
+  async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    await this.writeViaTemp(path, data, 0o644);
+  }
+
+  private async writeViaTemp(path: string, data: string | Uint8Array, mode: number): Promise<void> {
+    const dir = dirname(path);
+    await this.mkdirp(dir);
     const tmp = join(dir, `.${basename(path)}.shitaku-${randomBytes(4).toString('hex')}.tmp`);
     try {
       const handle = await open(tmp, 'w', mode);
       try {
-        await handle.writeFile(data, 'utf8');
+        await handle.writeFile(data);
         await handle.sync();
       } finally {
         await handle.close();
@@ -48,6 +52,28 @@ export class NodeFileSystem implements FileSystem {
       await rename(tmp, path);
     } catch (e) {
       await rm(tmp, { force: true });
+      throw e;
+    }
+  }
+
+  async exists(path: string): Promise<boolean> {
+    return stat(path).then(
+      () => true,
+      (e: unknown) => {
+        if (isMissing(e)) return false;
+        throw e;
+      },
+    );
+  }
+
+  /** Non-recursive on purpose: user files inside the directory are never deleted. */
+  async removeDir(path: string): Promise<boolean> {
+    try {
+      await rmdir(path);
+      return true;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'ENOTEMPTY' || code === 'EEXIST') return false;
       throw e;
     }
   }

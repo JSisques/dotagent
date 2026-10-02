@@ -13,6 +13,8 @@ export const claudeCodeTarget: AgentTarget = {
 
   serversKeyPath: () => ['mcpServers'],
 
+  skillsDir: (scope, paths) => join(scope === 'user' ? paths.homeDir : paths.cwd, '.claude', 'skills'),
+
   toEntry({ server }: McpItem): McpServerEntry {
     if (server.type === 'stdio') {
       return { type: 'stdio', command: server.command, args: server.args, ...(server.env && { env: server.env }) };

@@ -1,7 +1,7 @@
 import { mkdir, realpath, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { assertSafeRelPath, listTree, readTree } from '@/adapters/fs/walk.js';
+import { assertSafeRelPath, listTree, readFileNoFollow, readTree } from '@/adapters/fs/walk.js';
 import { MAX_DEPTH, MAX_FILE_BYTES, MAX_SKILL_BYTES, MAX_SKILL_FILES } from '@/domain/catalog/limits.js';
 import { UnsafeTreeError } from '@/ports/file-system.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
@@ -109,5 +109,28 @@ describe('assertSafeRelPath', () => {
 
   it.each(['../x', 'a/../b', 'a\\b', 'a\0b', '/abs', ''])('rejects %j', (bad) => {
     expect(() => assertSafeRelPath(bad)).toThrow(UnsafeTreeError);
+  });
+});
+
+describe('readFileNoFollow', () => {
+  it('reads a regular file and resolves to null when it is missing', async () => {
+    await put('a.md', 'hi');
+    expect(Array.from((await readFileNoFollow(join(root, 'a.md'), 'a.md')) ?? [])).toEqual([104, 105]);
+    expect(await readFileNoFollow(join(root, 'gone.md'), 'gone.md')).toBeNull();
+  });
+
+  it('refuses a file swapped for a symlink, naming the file', async () => {
+    await put('a.md', 'hi');
+    await symlink(join(root, 'a.md'), join(root, 'link.md'));
+    await expect(readFileNoFollow(join(root, 'link.md'), 'link.md')).rejects.toThrow(
+      /symbolic link not allowed: link.md/,
+    );
+  });
+
+  it('refuses a directory and an oversized file', async () => {
+    await mkdir(join(root, 'd'));
+    await expect(readFileNoFollow(join(root, 'd'), 'd')).rejects.toThrow(UnsafeTreeError);
+    await put('big.bin', new Uint8Array(MAX_FILE_BYTES + 1));
+    await expect(readFileNoFollow(join(root, 'big.bin'), 'big.bin')).rejects.toThrow(UnsafeTreeError);
   });
 });

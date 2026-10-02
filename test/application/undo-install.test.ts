@@ -5,7 +5,8 @@ import { FolderCatalogSource } from '@/adapters/catalog/folder-source.js';
 import { claudeCodeTarget } from '@/adapters/claude-code/target.js';
 import { NodeFileSystem } from '@/adapters/fs/node-fs.js';
 import { initMcps, type InitDeps } from '@/application/init-mcps.js';
-import { loadManifest, manifestPath } from '@/application/journal.js';
+import { appendInstall, loadManifest, manifestPath, stateDir } from '@/application/journal.js';
+import { sha256 } from '@/domain/hash.js';
 import { UndoSelectionError, undoInstall } from '@/application/undo-install.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
@@ -110,5 +111,34 @@ describe('undoInstall', () => {
     expect(await undoInstall(undoDeps(), {})).toMatchObject({ status: 'nothing' });
     expect(await undoInstall(undoDeps(), { id: installId })).toMatchObject({ status: 'already-undone', exitCode: 0 });
     await expect(undoInstall(undoDeps(), { id: 'nope' })).rejects.toThrow(UndoSelectionError);
+  });
+
+  describe('with a null afterHash (a file the install deleted)', () => {
+    const seed = async (path: string, backup: string, original: string) => {
+      await deps.fs.writeAtomic(`${stateDir(tmp.homeDir)}/${backup}`, original);
+      await appendInstall(deps.fs, tmp.homeDir, {
+        id: 'seed',
+        createdAt: '2026-10-02T00:00:00.000Z',
+        undoneAt: null,
+        source: { kind: 'bundled', location: CATALOG, catalogVersion: 1 },
+        files: [{ path, scope: 'project', backup, beforeHash: sha256(original), afterHash: null, items: [] }],
+        createdDirs: [],
+      });
+    };
+
+    it('treats an absent file as unchanged and restores it from its backup', async () => {
+      const path = join(tmp.cwd, 'removed.md');
+      await seed(path, 'backups/seed/0-removed.md', 'original\n');
+      expect(await undoInstall(undoDeps(), { dryRun: true })).toMatchObject({ status: 'dry-run', changed: [] });
+      expect(await undoInstall(undoDeps(), {})).toMatchObject({ status: 'undone', exitCode: 0 });
+      expect(await read(path)).toBe('original\n');
+    });
+
+    it('refuses with exit 3 when the file reappeared since the install', async () => {
+      const path = join(tmp.cwd, 'removed.md');
+      await seed(path, 'backups/seed/0-removed.md', 'original\n');
+      await writeFile(path, 'user wrote this');
+      expect(await undoInstall(undoDeps(), {})).toMatchObject({ status: 'refused', exitCode: 3, changed: [path] });
+    });
   });
 });

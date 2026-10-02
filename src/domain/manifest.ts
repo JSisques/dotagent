@@ -2,22 +2,39 @@ import { z } from 'zod';
 
 export class ManifestError extends Error {}
 
-const ItemSchema = z.object({
-  kind: z.literal('mcp'),
-  name: z.string(),
-  action: z.enum(['create', 'update']),
-  entryHash: z.string(),
-});
+const ItemSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('mcp'),
+    name: z.string(),
+    action: z.enum(['create', 'update']),
+    entryHash: z.string(),
+  }),
+  z.object({
+    kind: z.literal('skill'),
+    name: z.string(),
+    action: z.enum(['create', 'update']),
+    /** Tree hash of the skill as installed. */
+    entryHash: z.string(),
+    /** Absolute path of the skill directory. */
+    root: z.string(),
+  }),
+]);
 
-const FileSchema = z.object({
-  path: z.string(),
-  scope: z.enum(['project', 'user']),
-  /** Path relative to the shitaku state directory; null when the file did not exist before the install. */
-  backup: z.string().nullable(),
-  beforeHash: z.string().nullable(),
-  afterHash: z.string(),
-  items: z.array(ItemSchema),
-});
+const FileSchema = z
+  .object({
+    path: z.string(),
+    scope: z.enum(['project', 'user']),
+    /** Path relative to the shitaku state directory; null when the file did not exist before the install. */
+    backup: z.string().nullable(),
+    beforeHash: z.string().nullable(),
+    /** Null when the install deleted the file (a file of an older skill version that the new one drops). */
+    afterHash: z.string().nullable(),
+    items: z.array(ItemSchema),
+  })
+  .refine((f) => f.afterHash !== null || f.items.every((i) => i.kind === 'skill'), {
+    message: 'afterHash may be null only for skill files',
+    path: ['afterHash'],
+  });
 
 const InstallSchema = z.object({
   id: z.string(),
@@ -25,6 +42,8 @@ const InstallSchema = z.object({
   undoneAt: z.string().nullable(),
   source: z.object({ kind: z.enum(['bundled', 'folder']), location: z.string(), catalogVersion: z.number() }),
   files: z.array(FileSchema),
+  /** Directories the install created, parents first. Absent in manifests written before skills existed. */
+  createdDirs: z.array(z.string()).default([]),
 });
 
 export const ManifestSchema = z.object({ version: z.literal(1), installs: z.array(InstallSchema) });
@@ -55,8 +74,20 @@ export function deriveOwnership(manifest: Manifest): Ownership {
   const owned: Ownership = {};
   for (const install of manifest.installs.filter((i) => i.undoneAt === null)) {
     for (const file of install.files) {
-      const entries = (owned[file.path] ??= {});
-      for (const item of file.items) entries[item.name] = item.entryHash;
+      for (const item of file.items) {
+        if (item.kind === 'mcp') (owned[file.path] ??= {})[item.name] = item.entryHash;
+      }
+    }
+  }
+  return owned;
+}
+
+/** skill root directory -> tree hash of the skill shitaku last installed there. Undone installs do not count. */
+export function deriveSkillOwnership(manifest: Manifest): Record<string, string> {
+  const owned: Record<string, string> = {};
+  for (const install of manifest.installs.filter((i) => i.undoneAt === null)) {
+    for (const file of install.files) {
+      for (const item of file.items) if (item.kind === 'skill') owned[item.root] = item.entryHash;
     }
   }
   return owned;

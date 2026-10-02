@@ -11,6 +11,7 @@ const install = (id: string): Install => ({
   undoneAt: null,
   source: { kind: 'bundled', location: '/catalog', catalogVersion: 1 },
   files: [],
+  createdDirs: [],
 });
 
 describe('journal', () => {

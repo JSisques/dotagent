@@ -12,4 +12,6 @@ export interface AgentTarget {
   configPath(scope: Scope, paths: Paths): string;
   serversKeyPath(scope: Scope): string[];
   toEntry(item: McpItem): McpServerEntry;
+  /** Directory that holds one subdirectory per installed skill. */
+  skillsDir(scope: Scope, paths: Paths): string;
 }
