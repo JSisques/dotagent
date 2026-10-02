@@ -4,12 +4,11 @@
 
 <!--
   Badges that are intentionally NOT here yet (add them when their dependency lands):
-  TODO(npm downloads): shields.io/npm/dm/@jsisques/shitaku shows "package not found or too new" for a freshly published
-  package; add it once npm download stats exist.
   TODO(website): website badge/link once the docs site exists (#52).
 -->
 
 [![npm version](https://img.shields.io/npm/v/@jsisques/shitaku)](https://www.npmjs.com/package/@jsisques/shitaku)
+[![npm downloads](https://img.shields.io/npm/dm/@jsisques/shitaku)](https://www.npmjs.com/package/@jsisques/shitaku)
 [![CI](https://github.com/JSisques/shitaku/actions/workflows/ci.yml/badge.svg)](https://github.com/JSisques/shitaku/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.13-339933?logo=node.js&logoColor=white)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
