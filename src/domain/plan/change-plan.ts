@@ -31,6 +31,8 @@ export interface EnvStatus {
 export interface ChangePlan {
   files: FileChange[];
   requiredEnv: EnvStatus[];
+  /** Names of every env variable the planned items declare; the apply-time leak scan checks their values. */
+  declaredEnv: string[];
 }
 
 export interface BuildPlanInput {
@@ -43,27 +45,48 @@ export interface BuildPlanInput {
   env: Record<string, string | undefined>;
   /** Replace same-name entries whose content differs. */
   force?: boolean;
+  /** Hashes of the entries dotagent installed in this file, by name (derived from the manifest). */
+  owned?: Record<string, string>;
 }
 
 export const writesFile = (file: FileChange): boolean => file.items.some((i) => i.action === 'create' || i.action === 'update');
 
+/** Decides what to do with one entry given what the file holds now. */
+function classify(present: unknown, entry: McpServerEntry, owned: Record<string, string>, name: string, force: boolean): Pick<PlannedItem, 'action' | 'reason'> {
+  if (present === undefined) return { action: 'create' };
+  const presentHash = hashEntry(present);
+  if (presentHash === hashEntry(entry)) return { action: 'skip', reason: 'already installed' };
+  if (force) return { action: 'update', reason: 'overwritten by --force' };
+  if (owned[name] === presentHash) return { action: 'update', reason: 'installed by dotagent' };
+  return { action: 'conflict', reason: 'a different entry with this name exists' };
+}
+
+function mergeWrites(items: PlannedItem[], keyPath: string[], text: string | null): string {
+  const writes = Object.fromEntries(items.filter((p) => p.action === 'create' || p.action === 'update').map((p) => [p.name, p.entry]));
+  return Object.keys(writes).length > 0 ? mergeAtPath(text, keyPath, writes) : (text ?? '');
+}
+
+/** Re-plans a file against fresh content: items that would write are re-classified; the others stay as planned. */
+export function replanFile(file: FileChange, fresh: string | null, keyPath: string[], owned: Record<string, string>, force: boolean): FileChange {
+  const current = readAtPath(fresh, keyPath);
+  const items = file.items.map((i): PlannedItem =>
+    i.action === 'create' || i.action === 'update' ? { name: i.name, entry: i.entry, ...classify(current[i.name], i.entry, owned, i.name, force) } : i,
+  );
+  return { ...file, beforeHash: fresh === null ? null : sha256(fresh), before: fresh, after: mergeWrites(items, keyPath, fresh), items };
+}
+
 export function buildPlan(input: BuildPlanInput): ChangePlan {
-  const { items, target, scope, paths, existing, env, force = false } = input;
+  const { items, target, scope, paths, existing, env, force = false, owned = {} } = input;
   const keyPath = target.serversKeyPath(scope);
   const current = readAtPath(existing, keyPath);
 
   const planned: PlannedItem[] = items.map((item) => {
     const entry = target.toEntry(item);
     if (!target.supports(item)) return { name: item.name, action: 'skip', entry, reason: `not available for ${target.id}` };
-    const present = current[item.name];
-    if (present === undefined) return { name: item.name, action: 'create', entry };
-    if (hashEntry(present) === hashEntry(entry)) return { name: item.name, action: 'skip', entry, reason: 'already installed' };
-    if (force) return { name: item.name, action: 'update', entry, reason: 'overwritten by --force' };
-    return { name: item.name, action: 'conflict', entry, reason: 'a different entry with this name exists' };
+    return { name: item.name, entry, ...classify(current[item.name], entry, owned, item.name, force) };
   });
 
-  const writes = Object.fromEntries(planned.filter((p) => p.action === 'create' || p.action === 'update').map((p) => [p.name, p.entry]));
-  const after = Object.keys(writes).length > 0 ? mergeAtPath(existing, keyPath, writes) : (existing ?? '');
+  const after = mergeWrites(planned, keyPath, existing);
 
   const required = new Map<string, boolean>();
   for (const item of items.filter((i) => target.supports(i))) {
@@ -78,5 +101,6 @@ export function buildPlan(input: BuildPlanInput): ChangePlan {
     after,
     items: planned,
   };
-  return { files: [file], requiredEnv: [...required].map(([name, set]) => ({ name, set })) };
+  const declaredEnv = [...new Set(items.filter((i) => target.supports(i)).flatMap((i) => i.env.map((e) => e.name)))];
+  return { files: [file], requiredEnv: [...required].map(([name, set]) => ({ name, set })), declaredEnv };
 }
