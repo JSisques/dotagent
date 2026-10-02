@@ -162,3 +162,44 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
     expect(owned.files[0]?.items[0]?.action).toBe('update');
   });
 });
+
+describe('initMcps (user scope)', () => {
+  let tmp: TmpPaths;
+  let deps: InitDeps;
+  const userFile = () => join(tmp.homeDir, '.claude.json');
+  beforeEach(async () => {
+    tmp = await makeTmpPaths();
+    deps = {
+      source: new FolderCatalogSource(CATALOG, 'bundled'),
+      fs: new NodeFileSystem(),
+      target: claudeCodeTarget,
+      paths: { homeDir: tmp.homeDir, cwd: tmp.cwd },
+      env: { GITHUB_TOKEN: 'abc123' },
+    };
+  });
+  afterEach(() => tmp.cleanup());
+
+  it('adds the entry to ~/.claude.json keeping every other key, with a byte-identical backup', async () => {
+    const original = JSON.stringify({ projects: { a: 1 }, theme: 'dark', mcpServers: { other: { type: 'stdio', command: 'x' } } }, null, 2);
+    await writeFile(userFile(), original);
+    await initMcps(deps, { mcps: ['github'], scope: 'user' });
+    const doc = JSON.parse(await readFile(userFile(), 'utf8'));
+    expect(doc).toMatchObject({ projects: { a: 1 }, theme: 'dark', mcpServers: { other: { command: 'x' }, github: { type: 'http' } } });
+    const manifest = JSON.parse(await readFile(manifestPath(tmp.homeDir), 'utf8'));
+    const file = manifest.installs[0].files[0];
+    expect(file.scope).toBe('user');
+    expect(await readFile(join(stateDir(tmp.homeDir), file.backup), 'utf8')).toBe(original);
+  });
+
+  it('creates a missing ~/.claude.json containing only mcpServers', async () => {
+    await initMcps(deps, { mcps: ['context7'], scope: 'user' });
+    expect(Object.keys(JSON.parse(await readFile(userFile(), 'utf8')))).toEqual(['mcpServers']);
+  });
+
+  it('aborts on a corrupt ~/.claude.json leaving it byte-identical and the manifest absent', async () => {
+    await writeFile(userFile(), '{ nope');
+    await expect(initMcps(deps, { mcps: ['github'], scope: 'user' })).rejects.toThrow(ConfigError);
+    expect(await readFile(userFile(), 'utf8')).toBe('{ nope');
+    expect(await readdir(tmp.homeDir)).toEqual(['.claude.json']);
+  });
+});

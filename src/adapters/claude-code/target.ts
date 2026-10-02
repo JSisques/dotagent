@@ -8,8 +8,7 @@ export const claudeCodeTarget: AgentTarget = {
   supports: (item: McpItem) => item.targets === undefined || item.targets.includes('claude-code'),
 
   configPath(scope, paths) {
-    if (scope === 'user') throw new Error('user scope is not implemented yet');
-    return join(paths.cwd, '.mcp.json');
+    return scope === 'user' ? join(paths.homeDir, '.claude.json') : join(paths.cwd, '.mcp.json');
   },
 
   serversKeyPath: () => ['mcpServers'],

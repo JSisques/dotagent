@@ -24,8 +24,9 @@ describe('claude-code target', () => {
     expect(target.serversKeyPath('project')).toEqual(['mcpServers']);
   });
 
-  it('rejects user scope until it is implemented', () => {
-    expect(() => target.configPath('user', paths)).toThrow(/user scope/);
+  it('writes user scope to ~/.claude.json under mcpServers', () => {
+    expect(target.configPath('user', paths)).toBe('/h/.claude.json');
+    expect(target.serversKeyPath('user')).toEqual(['mcpServers']);
   });
 
   it('filters items by targets', () => {
