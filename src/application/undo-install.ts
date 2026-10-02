@@ -1,4 +1,4 @@
-import { sha256 } from '../domain/hash.js';
+import { sha256 } from '@/domain/hash.js';
 import type { Install, InstalledFile, Manifest } from '../domain/manifest.js';
 import type { FileSystem } from '../ports/file-system.js';
 import type { Paths } from '../ports/paths.js';

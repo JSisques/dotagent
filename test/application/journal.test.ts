@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NodeFileSystem } from '../../src/adapters/fs/node-fs.js';
 import { appendInstall, loadManifest, manifestPath, stateDir } from '../../src/application/journal.js';
 import { ManifestError, type Install } from '../../src/domain/manifest.js';
-import { makeTmpPaths, type TmpPaths } from '../helpers/tmp-paths.js';
+import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 const install = (id: string): Install => ({
   id,

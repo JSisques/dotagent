@@ -1,5 +1,5 @@
 import type { AgentTarget, McpServerEntry, Scope } from '../../ports/agent-target.js';
-import type { Paths } from '../../ports/paths.js';
+import type { Paths } from '@/ports/paths.js';
 import type { McpItem } from '../catalog/schema.js';
 import { hashEntry, sha256 } from '../hash.js';
 import { mergeAtPath, readAtPath } from '../json-merge.js';
