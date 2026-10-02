@@ -18,7 +18,10 @@ export class NodeFileSystem implements FileSystem {
   async writeAtomic(path: string, data: string): Promise<void> {
     const dir = dirname(path);
     await this.mkdirp(dir);
-    const mode = await stat(path).then((s) => s.mode & 0o777, () => 0o644);
+    const mode = await stat(path).then(
+      (s) => s.mode & 0o777,
+      () => 0o644,
+    );
     const tmp = join(dir, `.${basename(path)}.dotagent-${randomBytes(4).toString('hex')}.tmp`);
     try {
       const handle = await open(tmp, 'w', mode);

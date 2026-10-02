@@ -61,25 +61,33 @@ async function restore(deps: UndoDeps, file: InstalledFile): Promise<void> {
     if (bytes === null) throw new UndoVerifyError(`backup for ${file.path} is missing`);
     await deps.fs.writeAtomic(file.path, bytes);
   }
-  if (hashOf(await deps.fs.readText(file.path)) !== file.beforeHash) throw new UndoVerifyError(`${file.path} does not match its pre-install content after restore`);
+  if (hashOf(await deps.fs.readText(file.path)) !== file.beforeHash)
+    throw new UndoVerifyError(`${file.path} does not match its pre-install content after restore`);
 }
 
 export async function undoInstall(deps: UndoDeps, req: UndoRequest = {}): Promise<UndoResult> {
   const { homeDir } = deps.paths;
   const manifest = await loadManifest(deps.fs, homeDir);
-  const install = req.id === undefined ? [...manifest.installs].reverse().find((i) => i.undoneAt === null) : manifest.installs.find((i) => i.id === req.id);
+  const install =
+    req.id === undefined
+      ? [...manifest.installs].reverse().find((i) => i.undoneAt === null)
+      : manifest.installs.find((i) => i.id === req.id);
   if (req.id !== undefined && !install) throw new UndoSelectionError(`no install with id ${req.id}`);
   if (!install) return result('nothing');
   if (install.undoneAt !== null) return result('already-undone', install);
   assertNewestPerFile(manifest, install);
 
   const changed: string[] = [];
-  for (const file of install.files) if (hashOf(await deps.fs.readText(file.path)) !== file.afterHash) changed.push(file.path);
+  for (const file of install.files)
+    if (hashOf(await deps.fs.readText(file.path)) !== file.afterHash) changed.push(file.path);
   if (changed.length > 0 && !req.force) return result('refused', install, changed);
   if (req.dryRun) return result('dry-run', install, changed);
 
   for (const file of install.files) await restore(deps, file);
   const undoneAt = (deps.now ?? (() => new Date()))().toISOString();
-  await saveManifest(deps.fs, homeDir, { ...manifest, installs: manifest.installs.map((i) => (i === install ? { ...i, undoneAt } : i)) });
+  await saveManifest(deps.fs, homeDir, {
+    ...manifest,
+    installs: manifest.installs.map((i) => (i === install ? { ...i, undoneAt } : i)),
+  });
   return result('undone', install, changed);
 }

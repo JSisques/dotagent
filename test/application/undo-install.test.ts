@@ -48,7 +48,11 @@ describe('undoInstall', () => {
   });
 
   it('round-trips user scope back to the original bytes', async () => {
-    const original = JSON.stringify({ numStartups: 7, mcpServers: { other: { type: 'stdio', command: 'x' } } }, null, 2);
+    const original = JSON.stringify(
+      { numStartups: 7, mcpServers: { other: { type: 'stdio', command: 'x' } } },
+      null,
+      2,
+    );
     await writeFile(userFile(), original);
     await initMcps(deps, { mcps: ['context7'], scope: 'user' });
     expect(await read(userFile())).not.toBe(original);

@@ -42,7 +42,8 @@ function printPlan(deps: CliDeps, plan: ChangePlan): void {
     deps.out(`${file.scope} scope: ${file.path}`);
     for (const item of file.items) deps.out(`  ${item.name}: ${item.action}${item.reason ? ` (${item.reason})` : ''}`);
   }
-  for (const v of plan.requiredEnv) deps.out(v.set ? `env ${v.name}: set` : `warning: ${v.name} is not set; set it before using the server`);
+  for (const v of plan.requiredEnv)
+    deps.out(v.set ? `env ${v.name}: set` : `warning: ${v.name} is not set; set it before using the server`);
 }
 
 async function runInit(deps: CliDeps, opts: InitOptions): Promise<number> {
@@ -52,7 +53,14 @@ async function runInit(deps: CliDeps, opts: InitOptions): Promise<number> {
     return 1;
   }
   const source = deps.makeSource(opts.source);
-  const initDeps: InitDeps = { source, fs: deps.fs, target: deps.target, paths: deps.paths, env: deps.env, now: deps.now };
+  const initDeps: InitDeps = {
+    source,
+    fs: deps.fs,
+    target: deps.target,
+    paths: deps.paths,
+    env: deps.env,
+    now: deps.now,
+  };
   const where = opts.source ?? 'the bundled catalog';
   let catalog;
   try {
@@ -84,7 +92,8 @@ async function runInit(deps: CliDeps, opts: InitOptions): Promise<number> {
   }
 
   printPlan(deps, plan);
-  if (scope === 'user') deps.out('note: close Claude Code before applying, it may rewrite ~/.claude.json while running');
+  if (scope === 'user')
+    deps.out('note: close Claude Code before applying, it may rewrite ~/.claude.json while running');
   if (opts.dryRun) {
     deps.out('dry run: nothing was written');
     return 0;
@@ -120,7 +129,11 @@ async function runUndo(deps: CliDeps, opts: { id?: string; force?: boolean; dryR
   return result.exitCode;
 }
 
-const csv = (value: string): string[] => value.split(',').map((s) => s.trim()).filter(Boolean);
+const csv = (value: string): string[] =>
+  value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
   let exitCode = 0;
@@ -148,7 +161,10 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
     .option('--id <id>', 'install id to undo (must be the newest for its files)')
     .option('--force', 'restore even if files changed since the install')
     .option('--dry-run', 'show what would be restored')
-    .action(async (opts: { id?: string; force?: boolean; dryRun?: boolean }) => void (exitCode = await guarded(deps, () => runUndo(deps, opts))));
+    .action(
+      async (opts: { id?: string; force?: boolean; dryRun?: boolean }) =>
+        void (exitCode = await guarded(deps, () => runUndo(deps, opts))),
+    );
 
   try {
     await program.parseAsync(argv);
@@ -164,7 +180,15 @@ async function guarded(deps: CliDeps, run: () => Promise<number>): Promise<numbe
   try {
     return await run();
   } catch (e) {
-    const known = [UnknownMcpError, StaleFileError, LeakError, ConfigError, UndoSelectionError, UndoVerifyError, PromptCancelled];
+    const known = [
+      UnknownMcpError,
+      StaleFileError,
+      LeakError,
+      ConfigError,
+      UndoSelectionError,
+      UndoVerifyError,
+      PromptCancelled,
+    ];
     if (e instanceof Error && known.some((k) => e instanceof k)) {
       deps.err(`error: ${e.message}`);
       return 1;

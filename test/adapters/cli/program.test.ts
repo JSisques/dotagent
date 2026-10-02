@@ -12,14 +12,19 @@ const CATALOG = join(import.meta.dirname, '..', '..', '..', 'catalog');
 const TOKEN = 'abc123-secret-value';
 
 /** Scripted prompter; any call it was not scripted for fails the test. */
-function fakePrompter(script: Partial<Record<'mcps' | 'scope' | 'confirm', unknown>> & { conflict?: 'overwrite' | 'skip' } = {}) {
+function fakePrompter(
+  script: Partial<Record<'mcps' | 'scope' | 'confirm', unknown>> & { conflict?: 'overwrite' | 'skip' } = {},
+) {
   const calls: string[] = [];
   const unscripted = (name: string): never => {
     throw new Error(`unexpected prompt: ${name}`);
   };
   const prompter: Prompter = {
     selectMcps: async () => (calls.push('mcps'), (script.mcps as string[] | undefined) ?? unscripted('mcps')),
-    selectScope: async () => (calls.push('scope'), (script.scope as 'project' | 'user' | undefined) ?? unscripted('scope')),
+    selectScope: async () => (
+      calls.push('scope'),
+      (script.scope as 'project' | 'user' | undefined) ?? unscripted('scope')
+    ),
     resolveConflict: async () => (calls.push('conflict'), script.conflict ?? unscripted('conflict')),
     confirm: async () => (calls.push('confirm'), (script.confirm as boolean | undefined) ?? unscripted('confirm')),
     info: () => {},
@@ -173,7 +178,10 @@ describe('runCli', () => {
       const dir = join(tmp.root, 'custom');
       await mkdir(join(dir, 'mcps'), { recursive: true });
       await writeFile(join(dir, 'catalog.json'), JSON.stringify({ version: 1, items: { mcps: ['mine'] } }));
-      await writeFile(join(dir, 'mcps', 'mine.json'), JSON.stringify({ name: 'mine', description: 'd', server: { type: 'stdio', command: 'x' } }));
+      await writeFile(
+        join(dir, 'mcps', 'mine.json'),
+        JSON.stringify({ name: 'mine', description: 'd', server: { type: 'stdio', command: 'x' } }),
+      );
       expect(await run('init', '--source', dir, '--mcps', 'mine', '--scope', 'project')).toBe(0);
       expect(JSON.parse(await readFile(mcpFile(), 'utf8')).mcpServers.mine.command).toBe('x');
     });

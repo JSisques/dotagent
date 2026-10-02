@@ -21,7 +21,11 @@ export class FolderCatalogSource implements CatalogSource {
     const issues: CatalogIssue[] = [];
     const index = await this.readIndex();
 
-    const readEntries = async <T extends { name: string }>(dir: string, names: string[], schema: ZodType<T>): Promise<T[]> => {
+    const readEntries = async <T extends { name: string }>(
+      dir: string,
+      names: string[],
+      schema: ZodType<T>,
+    ): Promise<T[]> => {
       const found: T[] = [];
       for (const name of names) {
         const file = `${dir}/${name}.json`;

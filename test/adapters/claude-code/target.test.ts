@@ -36,7 +36,11 @@ describe('claude-code target', () => {
   });
 
   it('maps servers to entries, keeping placeholders verbatim', () => {
-    expect(target.toEntry(http)).toEqual({ type: 'http', url: 'https://x.test/mcp', headers: { Authorization: 'Bearer ${GITHUB_TOKEN}' } });
+    expect(target.toEntry(http)).toEqual({
+      type: 'http',
+      url: 'https://x.test/mcp',
+      headers: { Authorization: 'Bearer ${GITHUB_TOKEN}' },
+    });
     expect(target.toEntry(stdio)).toEqual({ type: 'stdio', command: 'npx', args: ['-y', 'pkg'], env: { K: '${K}' } });
   });
 });
