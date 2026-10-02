@@ -181,6 +181,7 @@ describe('release documentation', () => {
     expect(docs).toContain('v0.1.0');
     expect(docs).toContain('JSisques/shitaku');
     expect(docs.toLowerCase()).toContain('trusted publisher');
+    expect(docs).toContain('Allow npm publish');
     expect(docs).toMatch(/never rename[^\n]*`cd\.yml`/i);
   });
 
