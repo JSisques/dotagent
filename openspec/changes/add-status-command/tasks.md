@@ -28,11 +28,11 @@ Options: stacked-to-main, feature-branch-chain (PR2 base = PR1 branch, PR3 base 
 
 ## PR 1: Domain foundation
 
-- [ ] 1.1 RED: `test/domain/plan/status-plan.test.ts` covers all six states, `modified` over `out-of-date`, `missing` over all, `unreadable` -> `modified`, `unavailable` -> `unknown`
-- [ ] 1.2 GREEN: create `src/domain/plan/status-plan.ts` (types, `StatusItem`, `classifyStatus`)
-- [ ] 1.3 RED: `test/domain/manifest.test.ts` for `deriveOwnedItems`: undone excluded, newest wins with its `installId`, same name in two scopes kept apart
-- [ ] 1.4 GREEN: add `OwnedItem` and `deriveOwnedItems` to `src/domain/manifest.ts`; leave `deriveOwnership` untouched
-- [ ] 1.5 REFACTOR: move `readPresent` to `src/application/skill-tree.ts`, import it in `src/application/init-mcps.ts`; existing init tests and `test/architecture.test.ts` pass
+- [x] 1.1 RED: `test/domain/plan/status-plan.test.ts` covers all six states, `modified` over `out-of-date`, `missing` over all, `unreadable` -> `modified`, `unavailable` -> `unknown`
+- [x] 1.2 GREEN: create `src/domain/plan/status-plan.ts` (types, `StatusItem`, `classifyStatus`)
+- [x] 1.3 RED: `test/domain/manifest.test.ts` for `deriveOwnedItems`: undone excluded, newest wins with its `installId`, same name in two scopes kept apart
+- [x] 1.4 GREEN: add `OwnedItem` and `deriveOwnedItems` to `src/domain/manifest.ts`; leave `deriveOwnership` untouched
+- [x] 1.5 REFACTOR: move `readPresent` to `src/application/skill-tree.ts`, import it in `src/application/init-mcps.ts`; existing init tests and `test/architecture.test.ts` pass
 
 ## PR 2: getStatus use case
 
