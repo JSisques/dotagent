@@ -1,10 +1,22 @@
 import type { Profile } from './schema.js';
 
-/** Resolves a profile to its MCP names: parents first, de-duplicated in first-seen order. */
-export function resolveProfile(name: string, profiles: readonly Profile[], mcpNames: readonly string[]): string[] {
+export interface ResolvedProfile {
+  mcps: string[];
+  skills: string[];
+}
+
+/** Resolves a profile to its MCP and skill names: parents first, de-duplicated in first-seen order. */
+export function resolveProfile(
+  name: string,
+  profiles: readonly Profile[],
+  mcpNames: readonly string[],
+  skillNames: readonly string[],
+): ResolvedProfile {
   const byName = new Map(profiles.map((p) => [p.name, p]));
-  const known = new Set(mcpNames);
-  const result = new Set<string>();
+  const knownMcps = new Set(mcpNames);
+  const knownSkills = new Set(skillNames);
+  const mcps = new Set<string>();
+  const skills = new Set<string>();
 
   const visit = (current: string, trail: string[]): void => {
     if (trail.includes(current)) throw new Error(`profile cycle: ${[...trail, current].join(' -> ')}`);
@@ -13,20 +25,28 @@ export function resolveProfile(name: string, profiles: readonly Profile[], mcpNa
       throw new Error(`unknown profile '${current}'${trail.length ? ` (extended by '${trail.at(-1)}')` : ''}`);
     for (const parent of profile.extends) visit(parent, [...trail, current]);
     for (const mcp of profile.mcps) {
-      if (!known.has(mcp)) throw new Error(`profile '${current}' references unknown mcp '${mcp}'`);
-      result.add(mcp);
+      if (!knownMcps.has(mcp)) throw new Error(`profile '${current}' references unknown mcp '${mcp}'`);
+      mcps.add(mcp);
+    }
+    for (const skill of profile.skills) {
+      if (!knownSkills.has(skill)) throw new Error(`profile '${current}' references unknown skill '${skill}'`);
+      skills.add(skill);
     }
   };
 
   visit(name, []);
-  return [...result];
+  return { mcps: [...mcps], skills: [...skills] };
 }
 
 /** Returns one error message per profile that fails to resolve. */
-export function validateProfiles(profiles: readonly Profile[], mcpNames: readonly string[]): string[] {
+export function validateProfiles(
+  profiles: readonly Profile[],
+  mcpNames: readonly string[],
+  skillNames: readonly string[],
+): string[] {
   return profiles.flatMap((p) => {
     try {
-      resolveProfile(p.name, profiles, mcpNames);
+      resolveProfile(p.name, profiles, mcpNames, skillNames);
       return [];
     } catch (e) {
       return [e instanceof Error ? e.message : String(e)];

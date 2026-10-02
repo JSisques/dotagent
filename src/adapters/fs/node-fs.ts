@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
+import { listTree } from '@/adapters/fs/walk.js';
 import type { FileSystem } from '@/ports/file-system.js';
 
 const isMissing = (e: unknown): boolean => (e as NodeJS.ErrnoException).code === 'ENOENT';
@@ -13,6 +14,19 @@ export class NodeFileSystem implements FileSystem {
       if (isMissing(e)) return null;
       throw e;
     }
+  }
+
+  async readBytes(path: string): Promise<Uint8Array | null> {
+    try {
+      return new Uint8Array(await readFile(path));
+    } catch (e) {
+      if (isMissing(e)) return null;
+      throw e;
+    }
+  }
+
+  listFiles(dir: string): Promise<string[] | null> {
+    return listTree(dir);
   }
 
   async writeAtomic(path: string, data: string): Promise<void> {

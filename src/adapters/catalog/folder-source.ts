@@ -1,9 +1,11 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ZodType } from 'zod';
+import { readTree } from '@/adapters/fs/walk.js';
 import { resolveProfile } from '@/domain/catalog/profile.js';
 import { CatalogIndexSchema, McpItemSchema, ProfileSchema } from '@/domain/catalog/schema.js';
 import type { McpItem, Profile } from '@/domain/catalog/schema.js';
+import { parseSkill, type SkillItem } from '@/domain/catalog/skill.js';
 import type { CatalogIssue, CatalogSource, LoadedCatalog, SourceRef } from '@/ports/catalog-source.js';
 
 /** Reads a catalog folder. The bundled catalog is just a folder resolved by the composition root. */
@@ -48,10 +50,12 @@ export class FolderCatalogSource implements CatalogSource {
 
     const mcps: McpItem[] = await readEntries('mcps', index.items.mcps, McpItemSchema);
     const candidates: Profile[] = await readEntries('profiles', index.items.profiles, ProfileSchema);
+    const skills = await this.loadSkills(index.items.skills, issues);
     const mcpNames = mcps.map((m) => m.name);
+    const skillNames = skills.map((sk) => sk.name);
     const profiles = candidates.filter((p) => {
       try {
-        resolveProfile(p.name, candidates, mcpNames);
+        resolveProfile(p.name, candidates, mcpNames, skillNames);
         return true;
       } catch (e) {
         issues.push({ file: `profiles/${p.name}.json`, reason: e instanceof Error ? e.message : String(e) });
@@ -59,7 +63,34 @@ export class FolderCatalogSource implements CatalogSource {
       }
     });
 
-    return { mcps, profiles, issues };
+    return { mcps, skills, profiles, issues };
+  }
+
+  /** Loads each listed skill as bytes. A bad skill is skipped with an issue; an unlisted directory is an issue too. */
+  private async loadSkills(listed: readonly string[], issues: CatalogIssue[]): Promise<SkillItem[]> {
+    const skills: SkillItem[] = [];
+    const skillsRoot = join(await realpath(this.location), 'skills');
+    for (const name of listed) {
+      const file = `skills/${name}`;
+      try {
+        const files = await readTree(join(this.location, file), join(skillsRoot, name));
+        const parsed =
+          files === null ? { issue: 'listed in catalog.json but the directory is missing' } : parseSkill(name, files);
+        if ('issue' in parsed)
+          issues.push({ file: parsed.file ? `${file}/${parsed.file}` : file, reason: parsed.issue });
+        else skills.push(parsed.skill);
+      } catch (e) {
+        issues.push({ file, reason: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    const present = await readdir(join(this.location, 'skills'), { withFileTypes: true }).catch(() => []);
+    for (const name of present
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort()) {
+      if (!listed.includes(name)) issues.push({ file: `skills/${name}`, reason: 'not listed in catalog.json' });
+    }
+    return skills;
   }
 
   private async readIndex(): Promise<ReturnType<typeof CatalogIndexSchema.parse>> {

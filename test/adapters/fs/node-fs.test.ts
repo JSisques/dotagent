@@ -1,7 +1,8 @@
-import { chmod, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NodeFileSystem } from '@/adapters/fs/node-fs.js';
+import { UnsafeTreeError } from '@/ports/file-system.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
 describe('NodeFileSystem', () => {
@@ -47,5 +48,27 @@ describe('NodeFileSystem', () => {
     await fs.remove(file);
     await fs.remove(file);
     expect(await fs.readText(file)).toBeNull();
+  });
+
+  it('reads bytes and returns null for a missing file', async () => {
+    const file = join(tmp.cwd, 'a.bin');
+    await writeFile(file, new Uint8Array([0, 200, 1]));
+    expect(Array.from((await fs.readBytes(file)) ?? [])).toEqual([0, 200, 1]);
+    expect(await fs.readBytes(join(tmp.cwd, 'nope.bin'))).toBeNull();
+  });
+
+  it('lists regular files as sorted relative paths and null for a missing dir', async () => {
+    await mkdir(join(tmp.cwd, 'd', 'sub'), { recursive: true });
+    await writeFile(join(tmp.cwd, 'd', 'z.md'), 'z');
+    await writeFile(join(tmp.cwd, 'd', 'sub', 'a.md'), 'a');
+    expect(await fs.listFiles(join(tmp.cwd, 'd'))).toEqual(['sub/a.md', 'z.md']);
+    expect(await fs.listFiles(join(tmp.cwd, 'missing'))).toBeNull();
+  });
+
+  it('refuses to list a tree that contains a symlink', async () => {
+    await mkdir(join(tmp.cwd, 'd'));
+    await writeFile(join(tmp.cwd, 'real.md'), 'r');
+    await symlink(join(tmp.cwd, 'real.md'), join(tmp.cwd, 'd', 'link.md'));
+    await expect(fs.listFiles(join(tmp.cwd, 'd'))).rejects.toThrow(UnsafeTreeError);
   });
 });
