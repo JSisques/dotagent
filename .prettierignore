@@ -4,3 +4,4 @@ pnpm-lock.yaml
 coverage
 .atl/
 openspec/changes/archive/
+CHANGELOG.md

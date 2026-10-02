@@ -83,3 +83,7 @@ Contributors need Node `>=22.22.1` (`nvm use` reads `.nvmrc`). Git hooks are ins
 Bypass hooks with `git commit --no-verify`, `git push --no-verify`, or `HUSKY=0`.
 
 Exception: `pnpm run smoke:pack` (`scripts/smoke-pack.mjs`) intentionally keeps using `npm pack` and `npm install`, because it simulates how consumers install the published package.
+
+### Releasing
+
+Releases are manual: a maintainer dispatches the `CD` workflow on `main`. See [docs/releasing.md](docs/releasing.md) for the bootstrap, dry runs and failure recovery.
