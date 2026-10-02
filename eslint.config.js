@@ -5,7 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  globalIgnores(['dist', 'coverage', 'node_modules', 'openspec', 'test/fixtures/lint']),
+  globalIgnores(['dist', 'coverage', 'node_modules', 'openspec', 'test/fixtures/lint', 'CHANGELOG.md']),
   js.configs.recommended,
   {
     files: ['**/*.ts'],
