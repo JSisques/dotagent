@@ -62,18 +62,28 @@ Setting up an AI coding agent means hand-editing config files (`.mcp.json`, `~/.
 
 The bundled catalog lives in [`catalog/`](catalog/).
 
+The tables below are generated from `catalog/` by `pnpm run docs:catalog`. Do not edit them by hand.
+
 ### MCP servers
+
+<!-- catalog:mcps:start -->
 
 | Name       | Description                                                    |
 | ---------- | -------------------------------------------------------------- |
 | `context7` | Up-to-date library documentation for coding agents             |
 | `github`   | GitHub remote MCP server (repositories, issues, pull requests) |
 
+<!-- catalog:mcps:end -->
+
 ### Skills
+
+<!-- catalog:skills:start -->
 
 | Name            | Description                                                |
 | --------------- | ---------------------------------------------------------- |
 | `example-skill` | Minimal example skill that shows the catalog skill layout. |
+
+<!-- catalog:skills:end -->
 
 ## Usage
 
