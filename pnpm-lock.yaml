@@ -9,74 +9,74 @@ importers:
   .:
     dependencies:
       '@clack/prompts':
-        specifier: ^1.8.1
+        specifier: 1.8.1
         version: 1.8.1
       commander:
-        specifier: ^15.0.0
+        specifier: 15.0.0
         version: 15.0.0
       zod:
-        specifier: ^4.6.5
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@commitlint/cli':
-        specifier: ^21.2.3
+        specifier: 21.2.3
         version: 21.2.3(@types/node@26.6.4)(conventional-commits-parser@7.1.2)(typescript@6.0.3)
       '@commitlint/config-conventional':
-        specifier: ^21.2.3
+        specifier: 21.2.3
         version: 21.2.3
       '@eslint/js':
-        specifier: ^10.0.1
+        specifier: 10.0.1
         version: 10.0.1(eslint@10.11.0(jiti@2.6.1))
       '@semantic-release/changelog':
-        specifier: ^7.0.0
+        specifier: 7.0.0
         version: 7.0.0(semantic-release@25.0.9(typescript@6.0.3))
       '@semantic-release/exec':
-        specifier: ^7.1.0
+        specifier: 7.1.0
         version: 7.1.0(semantic-release@25.0.9(typescript@6.0.3))
       '@semantic-release/git':
-        specifier: ^11.0.1
+        specifier: 11.0.1
         version: 11.0.1(semantic-release@25.0.9(typescript@6.0.3))
       '@types/node':
-        specifier: ^26.6.4
+        specifier: 26.6.4
         version: 26.6.4
       conventional-changelog-conventionalcommits:
-        specifier: ^9.3.1
+        specifier: 9.3.1
         version: 9.3.1
       eslint:
-        specifier: ^10.11.0
+        specifier: 10.11.0
         version: 10.11.0(jiti@2.6.1)
       eslint-config-prettier:
-        specifier: ^10.1.8
+        specifier: 10.1.8
         version: 10.1.8(eslint@10.11.0(jiti@2.6.1))
       globals:
-        specifier: ^17.13.0
+        specifier: 17.13.0
         version: 17.13.0
       husky:
-        specifier: ^9.1.7
+        specifier: 9.1.7
         version: 9.1.7
       lint-staged:
-        specifier: ^17.6.0
+        specifier: 17.6.0
         version: 17.6.0
       prettier:
-        specifier: ^3.9.9
+        specifier: 3.9.9
         version: 3.9.9
       semantic-release:
-        specifier: ^25.0.9
+        specifier: 25.0.9
         version: 25.0.9(typescript@6.0.3)
       tsc-alias:
-        specifier: ^1.9.7
+        specifier: 1.9.7
         version: 1.9.7
       typescript:
-        specifier: ~6.0.3
+        specifier: 6.0.3
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.71.0
+        specifier: 8.71.0
         version: 8.71.0(eslint@10.11.0(jiti@2.6.1))(typescript@6.0.3)
       typescript-native:
-        specifier: npm:typescript@^7.0.2
+        specifier: npm:typescript@7.0.2
         version: typescript@7.0.2
       vitest:
-        specifier: ^5.0.3
+        specifier: 5.0.3
         version: 5.0.3(@types/node@26.6.4)(vite@8.3.2(@types/node@26.6.4)(jiti@2.6.1)(yaml@2.9.1))
 
 packages:
