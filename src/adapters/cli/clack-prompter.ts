@@ -1,9 +1,10 @@
 import { confirm, isCancel, log, multiselect, select } from '@clack/prompts';
 import type { McpItem } from '@/domain/catalog/schema.js';
-import type { ChangePlan, PlannedItem } from '@/domain/plan/change-plan.js';
+import type { SkillItem } from '@/domain/catalog/skill.js';
+import type { ChangePlan } from '@/domain/plan/change-plan.js';
 import type { Scope } from '@/ports/agent-target.js';
 import { PromptCancelled } from '@/ports/prompter.js';
-import type { Prompter } from '@/ports/prompter.js';
+import type { ConflictInfo, Prompter } from '@/ports/prompter.js';
 
 /** Unwraps a clack answer, turning a dismissed prompt into PromptCancelled. */
 function answer<T>(value: T | symbol): T {
@@ -17,7 +18,17 @@ export class ClackPrompter implements Prompter {
       await multiselect({
         message: 'Which MCP servers do you want to install?',
         options: options.map((m) => ({ value: m.name, label: m.name, hint: m.description })),
-        required: true,
+        required: false,
+      }),
+    );
+  }
+
+  async selectSkills(options: SkillItem[]): Promise<string[]> {
+    return answer<string[]>(
+      await multiselect({
+        message: 'Which skills do you want to install?',
+        options: options.map((s) => ({ value: s.name, label: s.name, hint: s.description })),
+        required: false,
       }),
     );
   }
@@ -27,28 +38,33 @@ export class ClackPrompter implements Prompter {
       await select<Scope>({
         message: 'Where should they be installed?',
         options: [
-          { value: 'project', label: 'Project', hint: './.mcp.json' },
-          { value: 'user', label: 'User', hint: '~/.claude.json' },
+          { value: 'project', label: 'Project', hint: './.mcp.json, ./.claude/skills' },
+          { value: 'user', label: 'User', hint: '~/.claude.json, ~/.claude/skills' },
         ],
       }),
     );
   }
 
-  async resolveConflict(item: PlannedItem): Promise<'overwrite' | 'skip'> {
+  async resolveConflict(conflict: ConflictInfo): Promise<'overwrite' | 'skip'> {
     return answer<'overwrite' | 'skip'>(
       await select<'overwrite' | 'skip'>({
-        message: `'${item.name}' already exists with different content (${item.reason ?? 'conflict'}). What now?`,
+        message: `${conflict.kind === 'skill' ? 'Skill' : 'MCP'} '${conflict.name}' already exists with different content (${conflict.reason}). What now?`,
         options: [
-          { value: 'skip', label: 'Keep the existing entry' },
-          { value: 'overwrite', label: 'Overwrite it' },
+          { value: 'skip', label: 'Keep the existing one' },
+          {
+            value: 'overwrite',
+            label: conflict.kind === 'skill' ? 'Replace the whole directory (backed up)' : 'Overwrite it',
+          },
         ],
       }),
     );
   }
 
   async confirm(plan: ChangePlan): Promise<boolean> {
-    const files = plan.files.length;
-    return answer<boolean>(await confirm({ message: `Apply the changes to ${files} file${files === 1 ? '' : 's'}?` }));
+    const targets = plan.files.filter((f) => f.items.length > 0).length + plan.skills.length;
+    return answer<boolean>(
+      await confirm({ message: `Apply the changes to ${targets} location${targets === 1 ? '' : 's'}?` }),
+    );
   }
 
   info(message: string): void {

@@ -5,11 +5,15 @@ Portable, configurable AI agent setup (skills, MCPs, etc.) installable via `npx 
 ## Usage
 
 ```sh
-# Interactive: pick MCPs and scope, review the plan, confirm
+# Interactive: pick MCPs, skills and scope, review the plan, confirm
 npx @jsisques/shitaku init
 
 # Non-interactive: no prompts
 shitaku init --mcps github,context7 --scope project
+
+# Skills only, or both kinds in one install (one --scope applies to both)
+shitaku init --skills example-skill --scope project
+shitaku init --mcps github --skills example-skill --scope project
 
 # Preview only: prints the plan, writes nothing (no backups, no manifest)
 shitaku init --mcps github --scope user --dry-run
@@ -18,17 +22,35 @@ shitaku init --mcps github --scope user --dry-run
 shitaku undo [--id <id>] [--force] [--dry-run]
 ```
 
-Scopes: `project` writes `./.mcp.json`, `user` writes `~/.claude.json` (close Claude Code first).
+Scopes: `project` writes MCPs to `./.mcp.json` and skills to `./.claude/skills/`; `user` writes MCPs to `~/.claude.json` and skills to `~/.claude/skills/` (close Claude Code first when writing `~/.claude.json`).
 
-Flags for `init`: `--mcps <a,b>`, `--scope project|user`, `--source <folder>`, `--dry-run`, `--yes` (skip confirmation, needs `--mcps` and `--scope`), `--force` (overwrite entries that differ).
+Flags for `init`: `--mcps <a,b>`, `--skills <a,b>`, `--scope project|user`, `--source <folder>`, `--dry-run`, `--yes` (skip confirmation, needs `--scope` and at least one of `--mcps`/`--skills`), `--force` (overwrite entries and skill directories that differ). `--mcps` and `--skills` are independent and optional, but at least one kind must be selected. Interactively, the skills prompt appears only when the catalog has skills.
 
 Exit codes: `0` ok, `1` error, `2` unresolved conflicts (an existing entry with the same name differs; re-run with `--force`), `3` undo refused because a file changed since the install (use `--force`).
 
 Secrets are written only as `${VAR}` placeholders, never as values. The plan warns, by name, about required variables that are not set. Before changing a file, shitaku backs it up under `~/.claude/.shitaku/backups/` and records the install in `~/.claude/.shitaku/manifest.json`.
 
+### Skills
+
+A skill is a directory `catalog/skills/<name>/` that holds a `SKILL.md` and any supporting files (scripts, templates, binary assets). `SKILL.md` starts with frontmatter that has a single-line `name` (it must equal the directory name and match `^[a-z0-9][a-z0-9-]*$`) and a non-empty single-line `description`. List the skill under `items.skills` in `catalog/catalog.json`. A skill directory that is not listed, or a listed one that is missing or invalid, is skipped with a warning (an invalid name that could escape the directory, such as `../evil`, fails the whole catalog). The bundled `example-skill` shows the layout.
+
+Install behavior: each skill is copied to `<scope skills dir>/<name>/`, with `SKILL.md` written last so a half-written skill never loads. The install is one entry in the manifest, together with any MCPs in the same run, and `shitaku undo` reverts both.
+
+Safety:
+
+- An existing directory with the same name is never overwritten silently. If it differs from the catalog version and shitaku did not install it (or it was modified since), it is reported as a conflict in the plan and `init` exits `2` without writing anything. Interactively you are asked per skill.
+- `--force` replaces the whole directory (files that are not in the catalog version are deleted) after backing every replaced file up under `~/.claude/.shitaku/backups/`. `undo` restores them byte for byte.
+- If a write fails, everything written so far is rolled back and the directories the install created are removed. Backups stay on disk.
+- `undo` refuses (exit `3`) when a recorded file changed, or when you added a file under a skill directory, since the install. `--force` restores the recorded files and leaves unknown files alone. Directories that the install created are removed only when empty.
+- Skill symlinks (the directory, a file inside it, or a catalog file) are rejected, and the catalog and target trees are walked with limits on file count, depth, per-file size and total size.
+
+Before downgrading shitaku to a version without skills support, run `shitaku undo` for any install that included skills: older versions do not understand skill entries in the manifest.
+
+Limits: skills are copied as plain files, so shitaku does not run, lint or sandbox them. There is no `list` command or profile selection on the CLI yet.
+
 ### Custom catalogs and trust
 
-`--source <folder>` reads a catalog from a folder instead of the bundled one. Treat it as code you run: stdio entries in a catalog are written to your config and Claude Code executes their `command` later. Only use folders you trust.
+`--source <folder>` reads a catalog from a folder instead of the bundled one. Treat it as code you run: stdio entries in a catalog are written to your config and Claude Code executes their `command` later. Skills from a `--source` folder are copied into your skills directory, and Claude Code may follow their instructions or run their scripts. Only use folders you trust.
 
 ### Known limitation
 
