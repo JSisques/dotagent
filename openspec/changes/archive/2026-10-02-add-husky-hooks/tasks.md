@@ -50,4 +50,4 @@ Chain strategy: pending
 
 ## Phase 4: Delivery
 
-- [ ] 4.1 Commit with conventional messages (for example `chore: add husky git hooks`, `docs: document git hooks`); no AI attribution.
+- [x] 4.1 Commit with conventional messages (for example `chore: add husky git hooks`, `docs: document git hooks`); no AI attribution.
