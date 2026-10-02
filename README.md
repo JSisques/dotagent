@@ -7,12 +7,14 @@
   TODO(website): website badge/link once the docs site exists (#52).
 -->
 
-[![npm version](https://img.shields.io/npm/v/@jsisques/shitaku)](https://www.npmjs.com/package/@jsisques/shitaku)
-[![npm downloads](https://img.shields.io/npm/dm/@jsisques/shitaku)](https://www.npmjs.com/package/@jsisques/shitaku)
-[![CI](https://github.com/JSisques/shitaku/actions/workflows/ci.yml/badge.svg)](https://github.com/JSisques/shitaku/actions/workflows/ci.yml)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.13-339933?logo=node.js&logoColor=white)](package.json)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+<p align="center">
+  <a href="https://www.npmjs.com/package/@jsisques/shitaku"><img alt="npm version" src="https://img.shields.io/npm/v/@jsisques/shitaku" /></a>
+  <a href="https://www.npmjs.com/package/@jsisques/shitaku"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@jsisques/shitaku" /></a>
+  <a href="https://github.com/JSisques/shitaku/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/JSisques/shitaku/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="package.json"><img alt="Node" src="https://img.shields.io/badge/node-%3E%3D22.13-339933?logo=node.js&logoColor=white" /></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
+  <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" /></a>
+</p>
 
 <!--
   TODO(demo) (#75): add a GIF or screenshot of `shitaku init` running here, e.g.
