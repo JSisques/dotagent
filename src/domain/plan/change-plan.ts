@@ -49,10 +49,17 @@ export interface BuildPlanInput {
   owned?: Record<string, string>;
 }
 
-export const writesFile = (file: FileChange): boolean => file.items.some((i) => i.action === 'create' || i.action === 'update');
+export const writesFile = (file: FileChange): boolean =>
+  file.items.some((i) => i.action === 'create' || i.action === 'update');
 
 /** Decides what to do with one entry given what the file holds now. */
-function classify(present: unknown, entry: McpServerEntry, owned: Record<string, string>, name: string, force: boolean): Pick<PlannedItem, 'action' | 'reason'> {
+function classify(
+  present: unknown,
+  entry: McpServerEntry,
+  owned: Record<string, string>,
+  name: string,
+  force: boolean,
+): Pick<PlannedItem, 'action' | 'reason'> {
   if (present === undefined) return { action: 'create' };
   const presentHash = hashEntry(present);
   if (presentHash === hashEntry(entry)) return { action: 'skip', reason: 'already installed' };
@@ -62,17 +69,33 @@ function classify(present: unknown, entry: McpServerEntry, owned: Record<string,
 }
 
 function mergeWrites(items: PlannedItem[], keyPath: string[], text: string | null): string {
-  const writes = Object.fromEntries(items.filter((p) => p.action === 'create' || p.action === 'update').map((p) => [p.name, p.entry]));
+  const writes = Object.fromEntries(
+    items.filter((p) => p.action === 'create' || p.action === 'update').map((p) => [p.name, p.entry]),
+  );
   return Object.keys(writes).length > 0 ? mergeAtPath(text, keyPath, writes) : (text ?? '');
 }
 
 /** Re-plans a file against fresh content: items that would write are re-classified; the others stay as planned. */
-export function replanFile(file: FileChange, fresh: string | null, keyPath: string[], owned: Record<string, string>, force: boolean): FileChange {
+export function replanFile(
+  file: FileChange,
+  fresh: string | null,
+  keyPath: string[],
+  owned: Record<string, string>,
+  force: boolean,
+): FileChange {
   const current = readAtPath(fresh, keyPath);
   const items = file.items.map((i): PlannedItem =>
-    i.action === 'create' || i.action === 'update' ? { name: i.name, entry: i.entry, ...classify(current[i.name], i.entry, owned, i.name, force) } : i,
+    i.action === 'create' || i.action === 'update'
+      ? { name: i.name, entry: i.entry, ...classify(current[i.name], i.entry, owned, i.name, force) }
+      : i,
   );
-  return { ...file, beforeHash: fresh === null ? null : sha256(fresh), before: fresh, after: mergeWrites(items, keyPath, fresh), items };
+  return {
+    ...file,
+    beforeHash: fresh === null ? null : sha256(fresh),
+    before: fresh,
+    after: mergeWrites(items, keyPath, fresh),
+    items,
+  };
 }
 
 export function buildPlan(input: BuildPlanInput): ChangePlan {
@@ -82,7 +105,8 @@ export function buildPlan(input: BuildPlanInput): ChangePlan {
 
   const planned: PlannedItem[] = items.map((item) => {
     const entry = target.toEntry(item);
-    if (!target.supports(item)) return { name: item.name, action: 'skip', entry, reason: `not available for ${target.id}` };
+    if (!target.supports(item))
+      return { name: item.name, action: 'skip', entry, reason: `not available for ${target.id}` };
     return { name: item.name, entry, ...classify(current[item.name], entry, owned, item.name, force) };
   });
 
@@ -90,7 +114,8 @@ export function buildPlan(input: BuildPlanInput): ChangePlan {
 
   const required = new Map<string, boolean>();
   for (const item of items.filter((i) => target.supports(i))) {
-    for (const v of item.env.filter((e) => e.required)) required.set(v.name, env[v.name] !== undefined && env[v.name] !== '');
+    for (const v of item.env.filter((e) => e.required))
+      required.set(v.name, env[v.name] !== undefined && env[v.name] !== '');
   }
 
   const file: FileChange = {

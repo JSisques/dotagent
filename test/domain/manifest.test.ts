@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deriveOwnership, emptyManifest, ManifestError, parseManifest, type Install, type Manifest } from '../../src/domain/manifest.js';
+import {
+  deriveOwnership,
+  emptyManifest,
+  ManifestError,
+  parseManifest,
+  type Install,
+  type Manifest,
+} from '../../src/domain/manifest.js';
 
 const install = (id: string, name: string, entryHash: string, over: Partial<Install> = {}): Install => ({
   id,

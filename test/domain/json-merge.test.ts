@@ -12,7 +12,8 @@ describe('json-merge', () => {
   });
 
   it('keeps unknown keys and sibling servers at every depth, in order', () => {
-    const before = JSON.stringify({ theme: 'dark', mcpServers: { other: { a: { b: 1 } } }, projects: { x: [1] } }, null, 2) + '\n';
+    const before =
+      JSON.stringify({ theme: 'dark', mcpServers: { other: { a: { b: 1 } } }, projects: { x: [1] } }, null, 2) + '\n';
     const out = mergeAtPath(before, KEY, { github: { type: 'http' } });
     const doc = JSON.parse(out);
     expect(doc.theme).toBe('dark');

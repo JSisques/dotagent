@@ -9,7 +9,8 @@ export function resolveProfile(name: string, profiles: readonly Profile[], mcpNa
   const visit = (current: string, trail: string[]): void => {
     if (trail.includes(current)) throw new Error(`profile cycle: ${[...trail, current].join(' -> ')}`);
     const profile = byName.get(current);
-    if (!profile) throw new Error(`unknown profile '${current}'${trail.length ? ` (extended by '${trail.at(-1)}')` : ''}`);
+    if (!profile)
+      throw new Error(`unknown profile '${current}'${trail.length ? ` (extended by '${trail.at(-1)}')` : ''}`);
     for (const parent of profile.extends) visit(parent, [...trail, current]);
     for (const mcp of profile.mcps) {
       if (!known.has(mcp)) throw new Error(`profile '${current}' references unknown mcp '${mcp}'`);

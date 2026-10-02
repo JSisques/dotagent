@@ -5,7 +5,15 @@ import { claudeCodeTarget } from '../../src/adapters/claude-code/target.js';
 import { FolderCatalogSource } from '../../src/adapters/catalog/folder-source.js';
 import { NodeFileSystem } from '../../src/adapters/fs/node-fs.js';
 import { ConfigError } from '../../src/domain/json-merge.js';
-import { applyPlan, initMcps, LeakError, planInit, StaleFileError, UnknownMcpError, type InitDeps } from '../../src/application/init-mcps.js';
+import {
+  applyPlan,
+  initMcps,
+  LeakError,
+  planInit,
+  StaleFileError,
+  UnknownMcpError,
+  type InitDeps,
+} from '../../src/application/init-mcps.js';
 import { appendInstall, manifestPath, stateDir } from '../../src/application/journal.js';
 import { hashEntry, sha256 } from '../../src/domain/hash.js';
 import type { Manifest } from '../../src/domain/manifest.js';
@@ -39,7 +47,10 @@ describe('initMcps (project scope)', () => {
   });
 
   it('merges into an existing file keeping unknown keys', async () => {
-    await writeFile(mcpFile(), JSON.stringify({ theme: 'dark', mcpServers: { other: { type: 'stdio', command: 'x' } } }));
+    await writeFile(
+      mcpFile(),
+      JSON.stringify({ theme: 'dark', mcpServers: { other: { type: 'stdio', command: 'x' } } }),
+    );
     await initMcps(deps, { mcps: ['context7'], scope: 'project' });
     const doc = JSON.parse(await readFile(mcpFile(), 'utf8'));
     expect(doc.theme).toBe('dark');
@@ -109,8 +120,15 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
     await initMcps(deps, { mcps: ['github'], scope: 'project' });
     const file = (await manifest()).installs[0]!.files[0]!;
     expect(await readFile(join(stateDir(tmp.homeDir), file.backup!), 'utf8')).toBe(original);
-    expect(file).toMatchObject({ path: mcpFile(), scope: 'project', beforeHash: sha256(original), afterHash: sha256(await readFile(mcpFile(), 'utf8')) });
-    expect(file.items).toEqual([{ kind: 'mcp', name: 'github', action: 'create', entryHash: expect.stringMatching(/^[0-9a-f]{64}$/) }]);
+    expect(file).toMatchObject({
+      path: mcpFile(),
+      scope: 'project',
+      beforeHash: sha256(original),
+      afterHash: sha256(await readFile(mcpFile(), 'utf8')),
+    });
+    expect(file.items).toEqual([
+      { kind: 'mcp', name: 'github', action: 'create', entryHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+    ]);
   });
 
   it('records no backup when the file did not exist', async () => {
@@ -138,7 +156,8 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
 
   it('writes placeholders only: no env value reaches any file under the temp root', async () => {
     await initMcps(deps, { mcps: ['github'], scope: 'project' });
-    for (const path of [mcpFile(), manifestPath(tmp.homeDir)]) expect(await readFile(path, 'utf8')).not.toContain('abc123');
+    for (const path of [mcpFile(), manifestPath(tmp.homeDir)])
+      expect(await readFile(path, 'utf8')).not.toContain('abc123');
   });
 
   it('aborts before writing when an env value appears in the output', async () => {
@@ -154,9 +173,20 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
     const unmanaged = await planInit(deps, { mcps: ['github'], scope: 'project' });
     expect(unmanaged.files[0]?.items[0]?.action).toBe('conflict');
     await appendInstall(deps.fs, tmp.homeDir, {
-      id: 'seed', createdAt: '2026-10-02T00:00:00.000Z', undoneAt: null,
+      id: 'seed',
+      createdAt: '2026-10-02T00:00:00.000Z',
+      undoneAt: null,
       source: { kind: 'bundled', location: CATALOG, catalogVersion: 1 },
-      files: [{ path: mcpFile(), scope: 'project', backup: null, beforeHash: null, afterHash: 'x', items: [{ kind: 'mcp', name: 'github', action: 'create', entryHash: hashEntry(stale) }] }],
+      files: [
+        {
+          path: mcpFile(),
+          scope: 'project',
+          backup: null,
+          beforeHash: null,
+          afterHash: 'x',
+          items: [{ kind: 'mcp', name: 'github', action: 'create', entryHash: hashEntry(stale) }],
+        },
+      ],
     });
     const owned = await planInit(deps, { mcps: ['github'], scope: 'project' });
     expect(owned.files[0]?.items[0]?.action).toBe('update');
@@ -180,11 +210,19 @@ describe('initMcps (user scope)', () => {
   afterEach(() => tmp.cleanup());
 
   it('adds the entry to ~/.claude.json keeping every other key, with a byte-identical backup', async () => {
-    const original = JSON.stringify({ projects: { a: 1 }, theme: 'dark', mcpServers: { other: { type: 'stdio', command: 'x' } } }, null, 2);
+    const original = JSON.stringify(
+      { projects: { a: 1 }, theme: 'dark', mcpServers: { other: { type: 'stdio', command: 'x' } } },
+      null,
+      2,
+    );
     await writeFile(userFile(), original);
     await initMcps(deps, { mcps: ['github'], scope: 'user' });
     const doc = JSON.parse(await readFile(userFile(), 'utf8'));
-    expect(doc).toMatchObject({ projects: { a: 1 }, theme: 'dark', mcpServers: { other: { command: 'x' }, github: { type: 'http' } } });
+    expect(doc).toMatchObject({
+      projects: { a: 1 },
+      theme: 'dark',
+      mcpServers: { other: { command: 'x' }, github: { type: 'http' } },
+    });
     const manifest = JSON.parse(await readFile(manifestPath(tmp.homeDir), 'utf8'));
     const file = manifest.installs[0].files[0];
     expect(file.scope).toBe('user');

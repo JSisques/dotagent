@@ -13,7 +13,8 @@ const cwd = process.cwd();
 const bundled = fileURLToPath(new URL('../catalog/', import.meta.url));
 
 process.exitCode = await runCli(process.argv, {
-  makeSource: (folder) => (folder ? new FolderCatalogSource(resolve(cwd, folder), 'folder') : new FolderCatalogSource(bundled, 'bundled')),
+  makeSource: (folder) =>
+    folder ? new FolderCatalogSource(resolve(cwd, folder), 'folder') : new FolderCatalogSource(bundled, 'bundled'),
   fs: new NodeFileSystem(),
   target: claudeCodeTarget,
   paths: { homeDir: homedir(), cwd },

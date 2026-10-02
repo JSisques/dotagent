@@ -43,13 +43,27 @@ export async function planInit(deps: InitDeps, req: InitRequest): Promise<Change
   const path = deps.target.configPath(req.scope, deps.paths);
   const existing = await deps.fs.readText(path);
   const owned = deriveOwnership(await loadManifest(deps.fs, deps.paths.homeDir))[path] ?? {};
-  return buildPlan({ items, target: deps.target, scope: req.scope, paths: deps.paths, existing, env: deps.env, force: req.force, owned });
+  return buildPlan({
+    items,
+    target: deps.target,
+    scope: req.scope,
+    paths: deps.paths,
+    existing,
+    env: deps.env,
+    force: req.force,
+    owned,
+  });
 }
 
 const actions = (file: FileChange): string => file.items.map((i) => `${i.name}:${i.action}`).join(',');
 
 /** Re-reads each file; re-plans once if it changed, aborting when the actions differ. */
-async function refresh(deps: InitDeps, file: FileChange, owned: Record<string, string>, force: boolean): Promise<FileChange> {
+async function refresh(
+  deps: InitDeps,
+  file: FileChange,
+  owned: Record<string, string>,
+  force: boolean,
+): Promise<FileChange> {
   const fresh = await deps.fs.readText(file.path);
   if ((fresh === null ? null : sha256(fresh)) === file.beforeHash) return file;
   const replanned = replanFile(file, fresh, deps.target.serversKeyPath(file.scope), owned, force);
@@ -60,7 +74,8 @@ async function refresh(deps: InitDeps, file: FileChange, owned: Record<string, s
 function assertNoLeak(plan: ChangePlan, files: FileChange[], env: InitDeps['env']): void {
   for (const name of plan.declaredEnv) {
     const value = env[name];
-    if (value && files.some((f) => f.after.includes(value))) throw new LeakError(`the value of ${name} would be written to disk; aborting`);
+    if (value && files.some((f) => f.after.includes(value)))
+      throw new LeakError(`the value of ${name} would be written to disk; aborting`);
   }
 }
 
@@ -69,7 +84,8 @@ export async function applyPlan(deps: InitDeps, plan: ChangePlan, opts: { force?
   const { homeDir } = deps.paths;
   const ownership = deriveOwnership(await loadManifest(deps.fs, homeDir));
   const files: FileChange[] = [];
-  for (const file of plan.files.filter(writesFile)) files.push(await refresh(deps, file, ownership[file.path] ?? {}, opts.force ?? false));
+  for (const file of plan.files.filter(writesFile))
+    files.push(await refresh(deps, file, ownership[file.path] ?? {}, opts.force ?? false));
   if (files.length === 0) return false;
   assertNoLeak(plan, files, deps.env);
 
@@ -87,11 +103,22 @@ export async function applyPlan(deps: InitDeps, plan: ChangePlan, opts: { force?
       backup,
       beforeHash: file.beforeHash,
       afterHash: sha256(file.after),
-      items: written.map((i) => ({ kind: 'mcp', name: i.name, action: i.action as 'create' | 'update', entryHash: hashEntry(i.entry) })),
+      items: written.map((i) => ({
+        kind: 'mcp',
+        name: i.name,
+        action: i.action as 'create' | 'update',
+        entryHash: hashEntry(i.entry),
+      })),
     });
   }
   const source = deps.source.ref();
-  await appendInstall(deps.fs, homeDir, { id, createdAt: now.toISOString(), undoneAt: null, source: { ...source, catalogVersion: 1 }, files: installed });
+  await appendInstall(deps.fs, homeDir, {
+    id,
+    createdAt: now.toISOString(),
+    undoneAt: null,
+    source: { ...source, catalogVersion: 1 },
+    files: installed,
+  });
   return true;
 }
 
