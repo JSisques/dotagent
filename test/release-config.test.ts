@@ -195,3 +195,9 @@ describe('release documentation', () => {
     expect(read('README.md')).toContain('docs/releasing.md');
   });
 });
+
+describe('smoke-pack script', () => {
+  it('packs with --ignore-scripts so lifecycle output (husky prepare) cannot corrupt the JSON', () => {
+    expect(read('scripts/smoke-pack.mjs')).toContain("'pack', '--ignore-scripts'");
+  });
+});
