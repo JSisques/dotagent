@@ -73,8 +73,8 @@ Base branches (stacked-to-main): each PR targets `main` after the previous merge
 
 ## Slice 4: CLI, prompter, docs
 
-- [ ] 4.1 `src/ports/prompter.ts`, `clack-prompter.ts`: `selectSkills`, `resolveConflict({kind,name,reason})`; update MCP call sites and fake prompter
-- [ ] 4.2 RED `test/adapters/cli/program.test.ts`: `--skills` only, both kinds, neither kind exits non-zero, unknown skill, `--help` lists `--skills`, exit 2 on non-interactive conflict, skills prompt only when catalog has skills, interactive decline
-- [ ] 4.3 GREEN `src/adapters/cli/program.ts`: `--skills`, at-least-one rule, printPlan with skill rows, undo output
-- [ ] 4.4 `README.md`: skills usage, `catalog/skills` layout, trust note, downgrade warning (undo before downgrading)
-- [ ] 4.5 Run full `pnpm test`, `typecheck`, `format:check`
+- [x] 4.1 `src/ports/prompter.ts`, `clack-prompter.ts`: `selectSkills`, `resolveConflict({kind,name,reason})`; update MCP call sites and fake prompter
+- [x] 4.2 RED `test/adapters/cli/program.test.ts`: `--skills` only, both kinds, neither kind exits non-zero, unknown skill, `--help` lists `--skills`, exit 2 on non-interactive conflict, skills prompt only when catalog has skills, interactive decline
+- [x] 4.3 GREEN `src/adapters/cli/program.ts`: `--skills`, at-least-one rule, printPlan with skill rows, undo output
+- [x] 4.4 `README.md`: skills usage, `catalog/skills` layout, trust note, downgrade warning (undo before downgrading)
+- [x] 4.5 Run full `pnpm test`, `typecheck`, `format:check`

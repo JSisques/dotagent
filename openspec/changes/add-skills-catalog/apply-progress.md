@@ -174,3 +174,53 @@ Strict TDD: tests written first, RED observed (4 failed / 21 passed in `undo-ins
 - Verification: `pnpm test` 20 files, 261 tests pass (was 254); typecheck, lint, format:check exit 0; `test/architecture.test.ts` unchanged.
 
 Still open: S-h (MCP-side dirs not tracked in createdDirs), S-i (`exists` follows symlinks), S-j / S-a (umask on writeBytes), S-b (mode not hashed), S1, S2, and all slice-1/2 open items. Next: slice 4.
+
+## Slice 4 (tasks 4.1-4.5): DONE. Mode: Strict TDD. Branch: feat/skills-catalog-4-cli (stacked on slice 3, PR #38)
+
+Completed: 4.1, 4.2, 4.3, 4.4, 4.5. All 26 tasks complete. Not committed; changes are in the working tree.
+
+### TDD Cycle Evidence
+
+| Task | Test file                         | Layer       | Safety net | RED                                                                 | GREEN               | Triangulate                                                                                                                                                                                                                                                                         | Refactor                                                    |
+| ---- | --------------------------------- | ----------- | ---------- | ------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 4.1  | test/adapters/cli/program.test.ts | Integration | 24/24      | part of the 15 failed run below (conflict `kind` assertion, skills) | 39/39 with 4.3      | MCP conflict reports `kind: mcp`, skill conflict `kind: skill` with reason                                                                                                                                                                                                          | None                                                        |
+| 4.2  | same                              | Integration | 24/24      | 15 failed / 24 passed (39) before any production change             | 39/39               | help lists `--skills`, skills only, both kinds, user scope, neither kind exit 1, unknown skill, symlink target exit 1 with `--force`, dry run, interactive (4 prompts), no skills prompt without skills, empty interactive selection, decline, conflict exit 2/force/skip/overwrite | None                                                        |
+| 4.3  | same                              | Integration | same       | same run                                                            | 39/39; full 277/277 | as 4.2                                                                                                                                                                                                                                                                              | `printPlan` row helper; conflicts unified across both kinds |
+| 4.4  | README.md                         | Docs        | n/a        | n/a                                                                 | prettier ok         | n/a                                                                                                                                                                                                                                                                                 | n/a                                                         |
+| 4.5  | whole suite                       | Full run    | n/a        | n/a                                                                 | see Verification    | n/a                                                                                                                                                                                                                                                                                 | n/a                                                         |
+
+### Work Unit Evidence
+
+| Evidence             | Value                                                                                                                                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Focused test command | `pnpm vitest run test/adapters/cli` -> 39/39 pass (24 before). Full `pnpm test`: 20 files, 277 tests pass (was 261)                                                                                                                                          |
+| Runtime harness      | `runCli` end to end against real NodeFileSystem on temp dirs and the bundled catalog: `init --skills example-skill` installs into `.claude/skills/`, `undo` reverts; conflict exits 2 with nothing written; `--force` replaces and undo restores; both kinds |
+| Rollback boundary    | Revert the slice-4 PR: prompter port and clack adapter, `program.ts`, CLI tests, README. Domain, application and ports from slices 1-3 are untouched                                                                                                         |
+
+### Verification
+
+`pnpm test` 277/277, `pnpm run typecheck`, `lint`, `format:check`, `build`, `smoke:pack` all exit 0. `test/architecture.test.ts` unchanged and green.
+
+### Behavior implemented
+
+- `init --skills <csv>`, independent of `--mcps`. If either flag is given, the other kind is not prompted (treated as none); with neither flag, interactive mode prompts MCPs, skills (only when the catalog has skills) and scope.
+- Non-interactive = `--yes`, or a kind flag plus `--scope`. Neither kind with `--yes` exits 1; `--yes` without `--scope` exits 1. An empty interactive selection of both kinds exits 1.
+- Single `--scope` for both kinds. `printPlan` skips files with no items and prints a row per skill; the "close Claude Code" note shows only when an MCP file is in the plan.
+- Conflicts unify MCP and skill items: non-interactive exit 2 listing each; interactive asks `resolveConflict({kind,name,reason})` per item, skip drops the item from the re-plan, overwrite sets force.
+- `UnknownSkillError` and `UnsafeTreeError` map to exit 1.
+- Clack prompter: MCP multiselect no longer `required` (at-least-one rule lives in the CLI); `selectSkills` added; skill conflict wording; confirm counts locations.
+- README documents skills: format, install behavior, safety, limits, downgrade warning, `--source` trust note.
+
+### Deviations from design
+
+- With only one kind flag and no `--scope`, the other kind's prompt is skipped and scope is still asked (design silent).
+- The MCP prompt lost `required: true`; the empty-selection check is in `runInit`.
+- ClackPrompter has no unit test (thin wrapper over @clack/prompts, as before).
+
+### Slice size
+
+295 inserted, 44 deleted lines in 5 modified files (about 340 changed), under the 400 budget; tests about 60%.
+
+### Still open
+
+S1 frontmatter block scalars/lists, S2 duplicate keys last wins, S-a/S-j umask on writeBytes, S-b mode not hashed, S-h MCP-side dirs not in createdDirs, S-i `exists` follows symlinks. `--profile` and `list` are out of scope by decision.

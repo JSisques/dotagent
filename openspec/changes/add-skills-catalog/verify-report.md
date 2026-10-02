@@ -204,3 +204,122 @@ SUGGESTION
 - S-j: Carried: umask on `writeBytes` (S-a), mode not hashed (S-b), frontmatter block scalars (S1) and duplicate keys (S2). W7 (dedupe) is resolved by the slice-2 remediation test.
 
 Next: sdd-apply for W-a and W-b (optional; non-blocking), then slice 4.
+
+---
+
+# Verify report: add-skills-catalog, Slice 4 (tasks 4.1-4.5) and final whole-change verdict
+
+Mode: Strict TDD, hybrid store. Slice 4 verdict: PASS WITH WARNINGS (0 CRITICAL, 1 WARNING, 5 SUGGESTION). Final whole-change verdict: PASS WITH WARNINGS (0 CRITICAL, 2 WARNING, 9 SUGGESTION), ready for archive after the delta-spec fixes in W-f are applied (or accepted).
+
+## Evidence (slice 4, working tree uncommitted)
+
+- `pnpm test`: 20 files, 277 tests passed. `typecheck`, `lint`, `format:check`, `build` (check-dist-aliases: 25 files clean), `smoke:pack`: all exit 0. `test/architecture.test.ts` unchanged (git diff empty).
+- tasks.md has 26 task lines (S1 10, S2 6, S3 5, S4 5), all `[x]`, 0 unchecked; code matches. apply-progress says "All 31 tasks" and the request said 31, but the file has 26 (documentation count error, S-p).
+- `gentle-ai sdd-verify-validate` does not exist in the installed binary; report persisted without it (as in slices 1-3).
+
+## Real built CLI run (node dist/main.js, temp HOME and cwd, stdin /dev/null)
+
+| Case                                                                      | Observed                                                                                                                                             | Exit  |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `init --help`                                                             | lists `--skills`, `--yes (requires --scope and --mcps and/or --skills)`, `--force` text mentions skill dirs                                          | 0     |
+| `init --skills example-skill --scope project --dry-run`                   | one row `example-skill: create` under the skill dir, no MCP file line, no "close Claude Code" note, "dry run: nothing was written"; no files created | 0     |
+| same with `--yes`                                                         | created `.claude/skills/example-skill/SKILL.md`; manifest in HOME `.claude/.shitaku/`                                                                | 0     |
+| repeat                                                                    | `example-skill: skip (already installed)`, "nothing to change"                                                                                       | 0     |
+| after editing the installed SKILL.md, no `--force`                        | `conflict: skill 'example-skill' already exists with different content` / `unresolved conflicts; re-run with --force`; file untouched                | 2     |
+| same plus `--force`                                                       | `example-skill: update (replaced by --force)`                                                                                                        | 0     |
+| `undo --dry-run`, `undo`                                                  | would restore / restored the SKILL.md (LIFO: undid the force install)                                                                                | 0     |
+| fresh HOME: install then `undo`                                           | project dir back to empty (created dirs pruned)                                                                                                      | 0     |
+| pre-existing user `example-skill/SKILL.md` ("mine"): `--yes`              | exit 2, file still "mine"; `--force` replaces; `undo` restores "mine" byte for byte                                                                  | 2/0/0 |
+| `--skills nope --yes --scope project`                                     | `error: unknown skill: nope`                                                                                                                         | 1     |
+| `--scope project --yes` (neither kind)                                    | `error: select at least one kind: pass --mcps and/or --skills`                                                                                       | 1     |
+| `--skills example-skill --yes` (no scope)                                 | `error: --yes requires --scope`                                                                                                                      | 1     |
+| target skill dir is a symlink, `--force`                                  | `error: ... is a symbolic link`                                                                                                                      | 1     |
+| `--mcps github --skills example-skill --scope project --yes`, then `undo` | both in one install and one undo; `.mcp.json` and skill dir removed                                                                                  | 0     |
+| `--mcps github --skills example-skill --scope user --dry-run`             | MCP file row, skill row, env warning and the "close Claude Code" note (only because an MCP file is in the plan)                                      | 0     |
+| `--skills example-skill --scope project --scope user --yes`               | silently takes the last `--scope` (user)                                                                                                             | 0     |
+| `--skills example-skill` without scope, no TTY                            | opens the scope prompt and hangs ("unsettled top-level await" warning); same pre-existing behavior as MCP-only flag mode                             | n/a   |
+
+## Slice 4 compliance matrix (mcp-install delta + skills-install CLI scenarios)
+
+| Scenario                                                                       | Test (test/adapters/cli/program.test.ts) / run                                             | Status    |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | --------- |
+| Init flow: Interactive (MCPs, skills, scope, confirm)                          | "prompts for MCPs, skills, scope and confirmation, then installs the skill"                | COMPLIANT |
+| Interactive without skills                                                     | "skips the skills prompt when the catalog has no skills"                                   | COMPLIANT |
+| Non-interactive                                                                | "installs without prompting when --mcps and --scope are given"                             | COMPLIANT |
+| Skills only (no MCP file touched)                                              | "installs only skills without touching the MCP file, then undo reverts"                    | COMPLIANT |
+| Both kinds in one install                                                      | "installs both kinds under one scope and undoes them together"                             | COMPLIANT |
+| Neither kind                                                                   | "exits 1 with --yes and neither ..."; real run exit 1                                      | COMPLIANT |
+| Empty interactive selection of both kinds                                      | "exits 1 when the interactive selection is empty for both kinds"                           | COMPLIANT |
+| Unknown MCP / unknown skill                                                    | "exits non-zero naming an unknown MCP", "exits 1 naming an unknown skill"                  | COMPLIANT |
+| Program name / help lists `--skills`                                           | "prints help", "lists --skills in init help"                                               | COMPLIANT |
+| Skill scope targets (user/project)                                             | "installs at user scope", project cases, real run                                          | COMPLIANT |
+| Non-interactive conflict (exit 2, nothing written)                             | skills "exits 2 non-interactively ..." and real run                                        | COMPLIANT |
+| Interactive conflict skip / overwrite (`{kind,name,reason}`)                   | "asks per skill conflict interactively and honours skip / overwrite"                       | COMPLIANT |
+| Interactive decline                                                            | "writes nothing when the interactive confirmation is declined"                             | COMPLIANT |
+| Force replace after backup, undo restores byte for byte                        | "replaces the whole directory with --force after a backup, and undo restores it"; real run | COMPLIANT |
+| Symlinked target                                                               | "exits 1 when the target skill directory is a symlink, even with --force"; real run        | COMPLIANT |
+| Dry run                                                                        | "prints the plan and writes nothing on --dry-run"; real run                                | COMPLIANT |
+| printPlan: skills-only has no MCP file; row per skill; note only with MCP file | assertions on `text()` plus real runs                                                      | COMPLIANT |
+
+## README accuracy
+
+Matches the real flags, exit codes, backup location, `--force` semantics (replaces the whole dir, deletes files not in the catalog), rollback keeps backups, undo exit 3 on drift, `--force` keeps unknown files, created dirs removed only when empty, downgrade warning, `--source` trust note, and the "no `list` or profile" limit (checked against the real runs). Not documented: the umask/mode caveat (S-a/S-b), that failed-apply backups are never cleaned (README says "Backups stay on disk", acceptable), and the 1 MiB per-file limit number (limits are mentioned generically).
+
+## Slice 3 remediation re-check (never formally verified before)
+
+| Item                                                     | Evidence                                                                                                                                                                                                                 | Status                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| W-a symlinked recorded file / symlink under root on undo | undo-install.test.ts: "refuses with exit 3, not a crash, when a recorded file was replaced by a symlink", "... user added a symlink under the skill root"; code maps `UnsafeTreeError` to drift (undo-install.ts:76,108) | RESOLVED                                |
+| W-b missing backup                                       | "refuses before touching anything when a needed backup is missing, and again on rerun"; `assertBackupsPresent` runs before restores                                                                                      | RESOLVED                                |
+| S-g tampered createdDirs                                 | "ignores a tampered createdDirs entry that lies outside the install scope"; `prunableDirs` filter                                                                                                                        | RESOLVED                                |
+| User decision: foreign-only created dir skipped          | two tests (lines 211, 341)                                                                                                                                                                                               | RESOLVED                                |
+| W-c/W-d docs reconciliation                              | design.md and the delta specs now carry the foreign-only and symlinked-file scenarios, the missing-backup and kept-backups text; tasks 3.4 updated                                                                       | RESOLVED with a structural caveat (W-f) |
+
+## Final verdict against issue #15 acceptance criteria
+
+| #   | Criterion                                                                | Executed evidence                                                                                                                                                                                                                                                                      | Status |
+| --- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | Catalog schema supports skills and is validated on load                  | schema.test.ts (default `[]`, `../evil` rejected naming the value), skill.test.ts (frontmatter, name mismatch, limits), folder-source.test.ts (invalid skipped with reason, unlisted and listed-but-missing flagged), bundled-catalog.test.ts; real run loaded bundled `example-skill` | MET    |
+| 2   | `init` installs a selected skill and `undo` reverts it                   | real CLI: install, undo to empty dir; forced replace and undo restore byte for byte; mixed MCP+skill undo; CLI tests                                                                                                                                                                   | MET    |
+| 3   | Existing user skills never overwritten silently                          | real CLI: conflict reported in plan, exit 2, file unchanged; `--force` only after backup; interactive ask per skill                                                                                                                                                                    | MET    |
+| 4   | Tests cover plan, apply and undo for skills; typecheck/build/vitest pass | skill-plan.test.ts, init-mcps.test.ts (apply, rollback), undo-install.test.ts, program.test.ts; 277/277, typecheck, lint, format:check, build, smoke:pack exit 0                                                                                                                       | MET    |
+| 5   | README documents the skills kind                                         | README "Skills" section, flags, scopes, safety, downgrade, trust note; accuracy checked against real runs                                                                                                                                                                              | MET    |
+
+## Carried open items classification
+
+| Item                                         | Classification | Rationale                                                                                                                           |
+| -------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| S1 frontmatter block scalars/lists           | non-blocking   | README documents "single-line name and description"; a block scalar is rejected as invalid (skipped with a warning), not mis-parsed |
+| S2 duplicate frontmatter keys, last wins     | non-blocking   | no safety impact; name must still equal the directory                                                                               |
+| S-a umask on writeBytes, S-b mode not hashed | non-blocking   | files written 0644 under umask 022; no mode bit restored on undo/replace; document as a known limit                                 |
+| S-h MCP-side dirs not in createdDirs         | non-blocking   | MCP files only; pre-existing behavior                                                                                               |
+| S-i `exists` follows symlinks                | non-blocking   | dangling link counts as missing; the write path still uses O_NOFOLLOW guards and symlinked targets exit 1                           |
+
+## Delta spec consistency for archive
+
+- MODIFIED requirement names (`Init flow`, `Manifest`, `Undo`, `Catalog layout and schema`, `Item validation`, `Profile extends`) all exist verbatim in `openspec/specs/{mcp-install,install-safety,catalog}/spec.md`, so a sync will replace them correctly. `skills-install` is a new capability (full spec, no delta header), and `ADDED` names (`Source guards and limits`, `Bundled example skill`, `Multi-file write failure`) do not collide.
+- The mcp-install MODIFIED `Init flow` replaces the whole requirement, so its scenarios (Interactive, Interactive without skills, Non-interactive, Skills only, Both kinds, Neither kind, Unknown MCP, Program name) must be the complete set; they are. Main spec's other requirements (Scope targets, Merge, Existing entries, Required env) stay untouched, correct.
+- W-f (WARNING, archive hygiene): in `install-safety/spec.md` the paragraph "Backups written for an install that then fails ..." is plain text sitting between two scenarios of `Multi-file write failure`, so a parser attaches it to the previous scenario, and the `Missing backup at undo` scenario sits under `Multi-file write failure` although it is undo behavior (belongs under the MODIFIED `Undo`). After sync the main spec would carry it under the wrong requirement. Move the scenario to `Undo` and fold the backups paragraph into the `Multi-file write failure` requirement body.
+- The `Undo` MODIFIED text ("MUST refuse when the skill directory contains user-added files") does not mention the foreign-only created-dir skip; the scenario in skills-install covers it. The main `Undo` requirement would still read "remove only files and directories shitaku created", compatible.
+- Spec requirement/scenario heading count across the four capability specs: 64 headings (`### Requirement:` plus `#### Scenario:`) in specs/.
+
+## Issues
+
+CRITICAL: none.
+
+WARNING
+
+- W-e (slice 4): the interactive scope prompt hint reads `Project (./.mcp.json)` (`src/adapters/cli/clack-prompter.ts:41`), which is MCP-only wording and misleading for a skills-only run (project skills go to `./.claude/skills/`). Reword the hint (for example `./.mcp.json, ./.claude/skills/`) or drop it.
+- W-f: delta spec structure for archive (see above): move `Missing backup at undo` into `Undo` and attach the backups paragraph to the requirement body.
+
+SUGGESTION
+
+- S-k: `--scope` given twice silently takes the last value (commander default); the issue decision says single scope. Optional: reject duplicates.
+- S-l: `init --skills x` without `--scope` and without a TTY hangs on the scope prompt (unsettled top-level await). Pre-existing for `--mcps` flag mode; consider failing fast when stdin is not a TTY.
+- S-m: `ClackPrompter` has no unit test (thin wrapper, disclosed); `selectSkills`, new conflict wording and `confirm` location count are only exercised by the fake.
+- S-n: README does not mention the umask/mode caveat or the per-file size number.
+- S-o: slices 1-3 exceeded the 400-line budget (disclosed; slice 4 is about 340 lines); recommend `size:exception` where flagged.
+- S-p: apply-progress.md says "All 31 tasks complete" but tasks.md has 26; correct the number.
+- Carried non-blocking: S1, S2, S-a/S-j, S-b, S-h, S-i (above).
+
+Next: archive. No source change is required; apply only the doc fixes in W-e (one line) and W-f (spec move) before or during archive.
