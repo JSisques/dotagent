@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 
 // Real home access must be impossible: `os.homedir()` throws and HOME points to a temp dir.
 // Code under test receives `homeDir` and `cwd` by injection (see test/helpers/tmp-paths.ts).
-const tmpHome = mkdtempSync(join(tmpdir(), 'dotagent-home-'));
+const tmpHome = mkdtempSync(join(tmpdir(), 'shitaku-home-'));
 process.env['HOME'] = tmpHome;
 process.env['USERPROFILE'] = tmpHome;
 

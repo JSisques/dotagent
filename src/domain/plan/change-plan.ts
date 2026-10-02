@@ -45,7 +45,7 @@ export interface BuildPlanInput {
   env: Record<string, string | undefined>;
   /** Replace same-name entries whose content differs. */
   force?: boolean;
-  /** Hashes of the entries dotagent installed in this file, by name (derived from the manifest). */
+  /** Hashes of the entries shitaku installed in this file, by name (derived from the manifest). */
   owned?: Record<string, string>;
 }
 
@@ -64,7 +64,7 @@ function classify(
   const presentHash = hashEntry(present);
   if (presentHash === hashEntry(entry)) return { action: 'skip', reason: 'already installed' };
   if (force) return { action: 'update', reason: 'overwritten by --force' };
-  if (owned[name] === presentHash) return { action: 'update', reason: 'installed by dotagent' };
+  if (owned[name] === presentHash) return { action: 'update', reason: 'installed by shitaku' };
   return { action: 'conflict', reason: 'a different entry with this name exists' };
 }
 

@@ -167,7 +167,7 @@ describe('initMcps safety (backup, re-read, leak scan, manifest)', () => {
     expect(await readdir(tmp.homeDir)).toEqual([]);
   });
 
-  it('updates an entry dotagent owns but protects an unmanaged one', async () => {
+  it('updates an entry shitaku owns but protects an unmanaged one', async () => {
     const stale = { type: 'stdio', command: 'old' };
     await writeFile(mcpFile(), JSON.stringify({ mcpServers: { github: stale } }));
     const unmanaged = await planInit(deps, { mcps: ['github'], scope: 'project' });

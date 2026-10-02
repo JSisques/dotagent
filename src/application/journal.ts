@@ -1,8 +1,8 @@
 import { emptyManifest, parseManifest, type Install, type Manifest } from '@/domain/manifest.js';
 import type { FileSystem } from '@/ports/file-system.js';
 
-/** Where dotagent keeps its manifest and backups; one location for both scopes. */
-export const stateDir = (homeDir: string): string => `${homeDir}/.claude/.dotagent`;
+/** Where shitaku keeps its manifest and backups; one location for both scopes. */
+export const stateDir = (homeDir: string): string => `${homeDir}/.claude/.shitaku`;
 export const manifestPath = (homeDir: string): string => `${stateDir(homeDir)}/manifest.json`;
 
 /** An absent manifest means nothing was installed yet; a corrupt one throws and is never replaced. */

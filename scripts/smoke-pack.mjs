@@ -1,13 +1,15 @@
 // Packed-install smoke test: packs the package, installs it in a temp dir and runs the binary.
 // It does not build: run `npm run build` first. It needs network access for `npm install`.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const root = join(import.meta.dirname, '..');
 const win = process.platform === 'win32';
 const npm = win ? 'npm.cmd' : 'npm';
+const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+const binName = Object.keys(pkg.bin)[0];
 
 function run(file, args, cwd, env) {
   return execFileSync(file, args, {
@@ -32,7 +34,7 @@ function main() {
     console.error('smoke-pack: dist/main.js is missing; run `npm run build` first');
     return 1;
   }
-  const tmp = mkdtempSync(join(tmpdir(), 'dotagent-smoke-'));
+  const tmp = mkdtempSync(join(tmpdir(), 'shitaku-smoke-'));
   try {
     const env = { ...process.env, HOME: tmp, USERPROFILE: tmp };
     const packed = JSON.parse(run(npm, ['pack', '--pack-destination', tmp, '--json'], root, env));
@@ -41,10 +43,10 @@ function main() {
     writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'smoke', private: true }));
     run(npm, ['install', '--no-audit', '--no-fund', '--ignore-scripts', tarball], tmp, env);
 
-    const bin = join(tmp, 'node_modules', '.bin', win ? 'dotagent-cli.cmd' : 'dotagent-cli');
-    assertHelp('dotagent-cli --help', run(bin, ['--help'], tmp, env));
+    const bin = join(tmp, 'node_modules', '.bin', win ? `${binName}.cmd` : binName);
+    assertHelp(`${binName} --help`, run(bin, ['--help'], tmp, env));
 
-    const main = join(tmp, 'node_modules', '@jsisques', 'dotagent', 'dist', 'main.js');
+    const main = join(tmp, 'node_modules', ...pkg.name.split('/'), 'dist', 'main.js');
     assertHelp('node dist/main.js --help', run(process.execPath, [main, '--help'], tmp, env));
     return 0;
   } catch (error) {

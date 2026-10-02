@@ -139,7 +139,7 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
   let exitCode = 0;
   const strip = (s: string): string => s.replace(/\n$/, '');
   const program = new Command()
-    .name('dotagent-cli')
+    .name('shitaku')
     .description('Install curated AI agent configuration from a catalog.')
     .exitOverride()
     .configureOutput({ writeOut: (s) => deps.out(strip(s)), writeErr: (s) => deps.err(strip(s)) });
