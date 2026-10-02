@@ -55,9 +55,9 @@ The lockfile is generated and excluded from the count. Code alone (~300) is Medi
 
 ## Phase 5: Manual maintainer tasks (NOT automatable, not for sdd-apply)
 
-- [ ] 5.1 Bootstrap PR `chore(release): 0.1.0` (version only); merge
-- [ ] 5.2 On that `main` commit: `npm publish` manually (2FA)
-- [ ] 5.3 `git tag v0.1.0 <sha>` and push the tag
-- [ ] 5.4 Register npm trusted publisher: `JSisques/shitaku`, workflow `cd.yml`, no environment
-- [ ] 5.5 Merge this change as `ci: ...`; update issue #27 (OIDC, bootstrap, manual dispatch, reworded criteria)
-- [ ] 5.6 Dispatch `CD` on `main` with `dry_run` true: expect OIDC success, no commit/tag/Release/publish
+- [x] 5.1 Bootstrap PR `chore(release): 0.1.0` (version only); merge
+- [x] 5.2 On that `main` commit: `npm publish` manually (2FA)
+- [x] 5.3 `git tag v0.1.0 <sha>` and push the tag
+- [x] 5.4 Register npm trusted publisher: `JSisques/shitaku`, workflow `cd.yml`, no environment
+- [x] 5.5 Merge this change as `ci: ...`; update issue #27 (OIDC, bootstrap, manual dispatch, reworded criteria)
+- [x] 5.6 Dispatch `CD` on `main` with `dry_run` true: expect OIDC success, no commit/tag/Release/publish
