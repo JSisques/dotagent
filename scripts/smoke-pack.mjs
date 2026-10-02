@@ -37,7 +37,7 @@ function main() {
   const tmp = mkdtempSync(join(tmpdir(), 'shitaku-smoke-'));
   try {
     const env = { ...process.env, HOME: tmp, USERPROFILE: tmp };
-    const packed = JSON.parse(run(npm, ['pack', '--pack-destination', tmp, '--json'], root, env));
+    const packed = JSON.parse(run(npm, ['pack', '--ignore-scripts', '--pack-destination', tmp, '--json'], root, env));
     const tarball = join(tmp, packed[0].filename);
 
     writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'smoke', private: true }));
