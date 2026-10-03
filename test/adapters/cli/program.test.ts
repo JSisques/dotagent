@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FolderCatalogSource } from '@/adapters/catalog/folder-source.js';
@@ -397,6 +397,86 @@ describe('runCli', () => {
     });
   });
 
+  describe('uninstall', () => {
+    const skillDir = () => join(tmp.cwd, '.claude', 'skills', 'example-skill');
+    const userFile = () => join(tmp.homeDir, '.claude.json');
+    const servers = async (path: string) => Object.keys(parseDoc(await readFile(path, 'utf8')).mcpServers);
+
+    it('is listed in --help', async () => {
+      await run('--help');
+      expect(text()).toContain('uninstall');
+    });
+
+    it('removes an owned MCP, exits 0 and leaves the config valid', async () => {
+      await run('init', '--mcps', 'github,context7', '--scope', 'project');
+      expect(await run('uninstall', 'github')).toBe(0);
+      expect(await servers(mcpFile())).toEqual(['context7']);
+      expect(text()).toMatch(/uninstalled mcp 'github'/);
+    });
+
+    it('removes an owned skill, and undo brings it back', async () => {
+      await run('init', '--skills', 'example-skill', '--scope', 'project');
+      expect(await run('uninstall', 'example-skill', '--kind', 'skill')).toBe(0);
+      await expect(readdir(skillDir())).rejects.toThrow();
+      expect(await run('undo')).toBe(0);
+      expect(await readdir(skillDir())).toEqual(['SKILL.md']);
+    });
+
+    it('exits 1 for a name shitaku does not own, even with --force', async () => {
+      await writeFile(mcpFile(), '{"mcpServers":{"ghost":{"type":"stdio","command":"x"}}}');
+      expect(await run('uninstall', 'ghost', '--force')).toBe(1);
+      expect(err.join('\n')).toMatch(/^error: .*ghost.*not installed/);
+      expect(await servers(mcpFile())).toEqual(['ghost']);
+    });
+
+    it('exits 1 listing the candidates when the scope is ambiguous, and --scope resolves it', async () => {
+      await run('init', '--mcps', 'github', '--scope', 'project');
+      await run('init', '--mcps', 'github', '--scope', 'user');
+      expect(await run('uninstall', 'github')).toBe(1);
+      expect(err.join('\n')).toMatch(/mcp \(project\), mcp \(user\)|mcp \(user\), mcp \(project\)/);
+      expect(await servers(mcpFile())).toEqual(['github']);
+      out.length = 0;
+      expect(await run('uninstall', 'github', '--scope', 'user')).toBe(0);
+      expect(await servers(userFile())).toEqual([]);
+      expect(text()).toContain('close Claude Code');
+    });
+
+    it('rejects an unknown --kind value', async () => {
+      expect(await run('uninstall', 'github', '--kind', 'plugin')).toBe(1);
+    });
+
+    it('exits 3 with the changed path and a --force hint, and --force removes', async () => {
+      await run('init', '--mcps', 'github', '--scope', 'project');
+      const edited = (await readFile(mcpFile(), 'utf8')).replace('"type"', '"x": 1, "type"');
+      await writeFile(mcpFile(), edited);
+      expect(await run('uninstall', 'github')).toBe(3);
+      expect(err).toContain(`changed since install: ${mcpFile()}`);
+      expect(err.join('\n')).toContain('--force');
+      expect(await readFile(mcpFile(), 'utf8')).toBe(edited);
+      expect(await run('uninstall', 'github', '--force')).toBe(0);
+      expect(await servers(mcpFile())).toEqual([]);
+    });
+
+    it('--dry-run prints the plan and writes nothing, but exits 3 on a modified item', async () => {
+      await run('init', '--mcps', 'github', '--scope', 'project');
+      const before = await readFile(mcpFile(), 'utf8');
+      expect(await run('uninstall', 'github', '--dry-run')).toBe(0);
+      expect(text()).toMatch(/dry run: would remove .*\.mcp\.json/);
+      expect(await readFile(mcpFile(), 'utf8')).toBe(before);
+      const edited = before.replace('"type"', '"x": 1, "type"');
+      await writeFile(mcpFile(), edited);
+      expect(await run('uninstall', 'github', '--dry-run')).toBe(3);
+      expect(await readFile(mcpFile(), 'utf8')).toBe(edited);
+    });
+
+    it('reports an item that is already absent and exits 0', async () => {
+      await run('init', '--skills', 'example-skill', '--scope', 'project');
+      await rm(skillDir(), { recursive: true });
+      expect(await run('uninstall', 'example-skill')).toBe(0);
+      expect(text()).toMatch(/already absent/);
+    });
+  });
+
   describe('status', () => {
     const skillFile = () => join(tmp.cwd, '.claude', 'skills', 'example-skill', 'SKILL.md');
     const manifestFile = () => join(tmp.homeDir, '.claude', '.shitaku', 'manifest.json');
@@ -511,6 +591,7 @@ describe('runCli', () => {
         ['status', ['status']],
         ['init', ['init', '--mcps', 'github', '--scope', 'project']],
         ['undo', ['undo']],
+        ['uninstall', ['uninstall', 'github']],
       ])('%s prints an error, no stack trace, and exits 1', async (_name, args) => {
         expect(await run(...args)).toBe(1);
         expect(err.join('\n')).toMatch(/^error: .*manifest/i);
