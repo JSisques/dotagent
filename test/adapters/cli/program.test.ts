@@ -600,6 +600,7 @@ describe('runCli', () => {
         ['init', ['init', '--mcps', 'github', '--scope', 'project']],
         ['undo', ['undo']],
         ['uninstall', ['uninstall', 'github']],
+        ['doctor', ['doctor']],
       ])('%s prints an error, no stack trace, and exits 1', async (_name, args) => {
         expect(await run(...args)).toBe(1);
         expect(err.join('\n')).toMatch(/^error: .*manifest/i);
@@ -867,6 +868,145 @@ describe('runCli', () => {
       expect(await run('status')).toBe(0);
       expect(asked).toBe(0);
       expect(err).toEqual([]);
+    });
+  });
+
+  describe('doctor', () => {
+    const skillDir = () => join(tmp.cwd, '.claude', 'skills', 'example-skill');
+    const install = async () => {
+      await run('init', '--yes', '--mcps', 'github', '--skills', 'example-skill', '--scope', 'project');
+      out = [];
+      err = [];
+    };
+    const breakSkill = () => rm(skillDir(), { recursive: true });
+    const jsonDoc = () =>
+      JSON.parse(out.join('\n')) as {
+        version: number;
+        target: string;
+        healthy: boolean;
+        summary: { problems: number; info: number };
+        findings: Record<string, unknown>[];
+      };
+
+    it('exits 0 and says no problems found on a healthy setup', async () => {
+      await install();
+      expect(await run('doctor')).toBe(0);
+      expect(out).toEqual(['target: claude-code', 'no problems found']);
+      expect(err).toEqual([]);
+    });
+
+    it('exits 4 when a problem exists and shows the item, message, fix and summary', async () => {
+      await install();
+      await breakSkill();
+      expect(await run('doctor')).toBe(4);
+      expect(out).toEqual([
+        'target: claude-code',
+        'problems:',
+        `  project skill example-skill is missing at ${skillDir()}`,
+        '    fix: run shitaku init again to reinstall the skill',
+        '1 problems, 0 info',
+      ]);
+    });
+
+    it('exits 0 and lists info findings when only info exists', async () => {
+      await install();
+      await writeFile(join(skillDir(), 'SKILL.md'), 'edited');
+      expect(await run('doctor')).toBe(0);
+      expect(out).toContain('info:');
+      expect(text()).toContain('project skill example-skill: modified since install');
+      expect(out.at(-1)).toBe('0 problems, 1 info');
+    });
+
+    it('restricts the diagnosis with --scope', async () => {
+      await install();
+      await breakSkill();
+      expect(await run('doctor', '--scope', 'user')).toBe(0);
+      expect(out).toEqual(['target: claude-code', 'no problems found']);
+    });
+
+    it('prints one versioned JSON document with every finding field', async () => {
+      await install();
+      await breakSkill();
+      expect(await run('doctor', '--json')).toBe(4);
+      expect(out).toHaveLength(1);
+      expect(jsonDoc()).toEqual({
+        version: 1,
+        target: 'claude-code',
+        healthy: false,
+        summary: { problems: 1, info: 0 },
+        findings: [
+          {
+            severity: 'problem',
+            code: 'skill-missing',
+            scope: 'project',
+            kind: 'skill',
+            name: 'example-skill',
+            path: skillDir(),
+            message: expect.stringMatching(/example-skill/) as string,
+            fix: expect.stringMatching(/\S/) as string,
+          },
+        ],
+      });
+    });
+
+    it('prints a healthy JSON document and exits 0', async () => {
+      await install();
+      expect(await run('doctor', '--json')).toBe(0);
+      expect(jsonDoc()).toEqual({
+        version: 1,
+        target: 'claude-code',
+        healthy: true,
+        summary: { problems: 0, info: 0 },
+        findings: [],
+      });
+    });
+
+    it('warns on stderr when the catalog is unavailable and keeps stdout one JSON document', async () => {
+      await install();
+      await breakSkill();
+      expect(await run('doctor', '--json', '--source', join(tmp.root, 'nope'))).toBe(4);
+      expect(err.join('\n')).toMatch(/^warning: .*catalog/);
+      expect(jsonDoc().findings.map((f) => f.code)).toEqual(['skill-missing']);
+    });
+
+    it('reports out-of-date as info with exit 0 using the catalog given by --source', async () => {
+      const dir = join(tmp.root, 'custom');
+      await mkdir(join(dir, 'mcps'), { recursive: true });
+      await writeFile(join(dir, 'catalog.json'), JSON.stringify({ version: 1, items: { mcps: ['mine'] } }));
+      const publish = (command: string) =>
+        writeFile(
+          join(dir, 'mcps', 'mine.json'),
+          JSON.stringify({ name: 'mine', description: 'd', server: { type: 'stdio', command } }),
+        );
+      await publish('x');
+      await run('init', '--source', dir, '--mcps', 'mine', '--scope', 'project');
+      await publish('y');
+      out = [];
+      expect(await run('doctor', '--source', dir, '--json')).toBe(0);
+      expect(jsonDoc().findings).toMatchObject([{ severity: 'info', code: 'out-of-date', name: 'mine' }]);
+    });
+
+    it('never prints environment values, only names, in text or JSON', async () => {
+      await install();
+      env = { SENTINEL: 's3cret-sentinel-value' };
+      for (const args of [['doctor'], ['doctor', '--json'], ['doctor', '--json', '--source', join(tmp.root, 'nope')]]) {
+        out = [];
+        err = [];
+        expect(await run(...args)).toBe(4);
+        expect(text()).toContain('GITHUB_TOKEN');
+        expect(text()).not.toContain('s3cret-sentinel-value');
+      }
+    });
+
+    it('writes nothing', async () => {
+      await install();
+      await breakSkill();
+      const before = await readFile(mcpFile(), 'utf8');
+      const manifest = await readFile(join(tmp.homeDir, '.claude', '.shitaku', 'manifest.json'), 'utf8');
+      await run('doctor');
+      expect(await readFile(mcpFile(), 'utf8')).toBe(before);
+      expect(await readFile(join(tmp.homeDir, '.claude', '.shitaku', 'manifest.json'), 'utf8')).toBe(manifest);
+      await expect(readdir(skillDir())).rejects.toThrow();
     });
   });
 });
