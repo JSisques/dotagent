@@ -113,13 +113,16 @@ shitaku uninstall <name> [--scope project|user] [--kind mcp|skill] [--force] [--
 
 # Report what shitaku installed and whether it changed (read-only)
 shitaku status [--scope project|user] [--source <folder>] [--json]
+
+# Diagnose installed items and suggest fixes (read-only, exits 4 on problems)
+shitaku doctor [--scope project|user] [--source <folder>] [--json]
 ```
 
 Scopes: `project` writes MCPs to `./.mcp.json` and skills to `./.claude/skills/`; `user` writes MCPs to `~/.claude.json` and skills to `~/.claude/skills/` (close Claude Code first when writing `~/.claude.json`).
 
 Flags for `init`: `--mcps <a,b>`, `--skills <a,b>`, `--scope project|user`, `--source <folder>`, `--dry-run`, `--yes` (skip confirmation, needs `--scope` and at least one of `--mcps`/`--skills`), `--force` (overwrite entries and skill directories that differ). `--mcps` and `--skills` are independent and optional, but at least one kind must be selected. Interactively, the skills prompt appears only when the catalog has skills.
 
-Exit codes: `0` ok, `1` error, `2` unresolved conflicts (an existing entry with the same name differs; re-run with `--force`), `3` undo or uninstall refused because a file or item changed since the install (use `--force`).
+Exit codes: `0` ok, `1` error, `2` unresolved conflicts (an existing entry with the same name differs; re-run with `--force`), `3` undo or uninstall refused because a file or item changed since the install (use `--force`), `4` `doctor` found problems.
 
 Secrets are written only as `${VAR}` placeholders, never as values. The plan warns, by name, about required variables that are not set. Before changing a file, shitaku backs it up under `~/.claude/.shitaku/backups/` and records the install in `~/.claude/.shitaku/manifest.json`.
 
@@ -228,6 +231,39 @@ When nothing matches it prints `no matching items`.
 `items` is flat and sorted by kind, then name; an empty result is `"items": []`. Whitespace in descriptions is collapsed only in text mode.
 
 Invalid skills, MCPs and profiles are skipped with a `warning: skipped <file>: <reason>` line on stderr (in both modes), so stdout stays valid JSON. Exit codes: `0` ok, including no matches; `1` for an invalid kind or a catalog that cannot be loaded (`error: cannot load catalog from <where>: <message>`).
+
+### Doctor
+
+`shitaku doctor` checks everything shitaku installed and has not undone, in both scopes unless `--scope` is given, and never writes anything. Each finding has a message and a suggested fix; the output ends with a count of problems and info findings:
+
+```
+target: claude-code
+problems:
+  project mcp github: GITHUB_TOKEN is not set in the current environment
+    fix: export GITHUB_TOKEN before starting your agent
+info:
+  project skill example-skill: modified since install  /work/app/.claude/skills/example-skill
+1 problems, 1 info
+```
+
+A healthy setup prints `no problems found`. Problems depend only on the manifest, the installed files and your environment, never on the catalog.
+
+| Code                | Severity | Meaning                                                                                            |
+| ------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `config-missing`    | problem  | a config file shitaku wrote is gone (one finding per file)                                         |
+| `config-unreadable` | problem  | a config file exists but cannot be read or parsed (one finding per file)                           |
+| `mcp-missing`       | problem  | the config file is fine but the installed MCP entry is gone                                        |
+| `skill-missing`     | problem  | an installed skill directory is gone                                                               |
+| `env-unset`         | problem  | an installed entry needs `${VAR}` (no default) and `VAR` is unset or empty; only the name is shown |
+| `duplicate-mcp`     | problem  | the same MCP is in both user scope and the current project's `.mcp.json`                           |
+| `modified`          | info     | the item differs from what was installed                                                           |
+| `out-of-date`       | info     | untouched, but the catalog has a newer version                                                     |
+
+`--json` prints one document, `{ "version": 1, "target", "healthy", "summary": { "problems", "info" }, "findings": [{ "severity", "code", "scope", "kind", "name", "path", "variable"?, "message", "fix" }] }`. `name` is `null` for `config-*` findings and `variable` appears only for `env-unset`. Later changes to its shape are additive.
+
+The catalog is loaded only to find `out-of-date` items. If it cannot be loaded, a warning goes to stderr (so stdout stays valid JSON), `out-of-date` is skipped, and the exit code is unchanged. Environment values are never printed.
+
+Exit codes: `0` no problems (info findings allowed), `4` at least one problem, `1` error, including a corrupt manifest.
 
 ### Custom catalogs and trust
 

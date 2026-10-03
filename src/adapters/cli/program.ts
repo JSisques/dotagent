@@ -9,6 +9,7 @@ import {
 } from '@/application/init-mcps.js';
 import type { InitDeps } from '@/application/init-mcps.js';
 import { checkForUpdate } from '@/application/check-update.js';
+import { getDiagnosis } from '@/application/doctor.js';
 import { CatalogLoadError, listCatalog } from '@/application/list-catalog.js';
 import { getStatus, type StatusReport } from '@/application/status.js';
 import { undoInstall, UndoSelectionError, UndoVerifyError } from '@/application/undo-install.js';
@@ -17,6 +18,7 @@ import { collapseWhitespace, LIST_KINDS, type CatalogEntry, type ListKind } from
 import { ConfigError } from '@/domain/json-merge.js';
 import { ManifestError } from '@/domain/manifest.js';
 import type { ChangePlan } from '@/domain/plan/change-plan.js';
+import type { Finding } from '@/domain/plan/doctor-plan.js';
 import type { AgentTarget, Scope } from '@/ports/agent-target.js';
 import type { CatalogSource } from '@/ports/catalog-source.js';
 import { UnsafeTreeError, type FileSystem } from '@/ports/file-system.js';
@@ -66,8 +68,12 @@ interface ListOptions {
   json?: boolean;
 }
 
-/** Exit codes: 0 ok, 1 error, 2 unresolved conflicts, 3 undo or uninstall refused (item changed since install). */
+/**
+ * Exit codes: 0 ok, 1 error, 2 unresolved conflicts, 3 undo or uninstall refused (item changed since install),
+ * 4 doctor found problems.
+ */
 const EXIT_CONFLICT = 2;
+const EXIT_PROBLEMS = 4;
 
 /** Version of the `status --json` document; later changes to its shape must be additive. */
 const STATUS_JSON_VERSION = 1;
@@ -104,6 +110,9 @@ async function runList(deps: CliDeps, kind: ListKind | undefined, opts: ListOpti
   else printList(deps, report.items);
   return 0;
 }
+
+/** Version of the `doctor --json` document; later changes to its shape must be additive. */
+const DOCTOR_JSON_VERSION = 1;
 
 function printPlan(deps: CliDeps, plan: ChangePlan): void {
   const row = (name: string, action: string, reason?: string): string =>
@@ -296,6 +305,52 @@ async function runStatus(deps: CliDeps, opts: { scope?: Scope; source?: string; 
   return 0;
 }
 
+function printDiagnosis(deps: CliDeps, target: string, findings: Finding[]): void {
+  const problems = findings.filter((f) => f.severity === 'problem');
+  const info = findings.filter((f) => f.severity === 'info');
+  deps.out(`target: ${target}`);
+  if (problems.length === 0) deps.out('no problems found');
+  else {
+    deps.out('problems:');
+    for (const f of problems) {
+      deps.out(`  ${f.message}`);
+      deps.out(`    fix: ${f.fix}`);
+    }
+  }
+  if (info.length > 0) {
+    deps.out('info:');
+    for (const f of info) deps.out(`  ${f.message}  ${f.path}`);
+  }
+  if (findings.length > 0) deps.out(`${problems.length} problems, ${info.length} info`);
+}
+
+async function runDoctor(deps: CliDeps, opts: { scope?: Scope; source?: string; json?: boolean }): Promise<number> {
+  const report = await getDiagnosis(
+    { source: deps.makeSource(opts.source), fs: deps.fs, target: deps.target, paths: deps.paths, env: deps.env },
+    { scope: opts.scope },
+  );
+  // Warnings go to stderr in both modes so `--json` keeps stdout parseable.
+  if (report.catalog === 'unavailable') deps.err('warning: catalog unavailable; out-of-date checks were skipped');
+  for (const issue of report.issues) deps.err(`warning: skipped ${issue.file}: ${issue.reason}`);
+  const problems = report.findings.filter((f) => f.severity === 'problem').length;
+  if (opts.json) {
+    deps.out(
+      JSON.stringify(
+        {
+          version: DOCTOR_JSON_VERSION,
+          target: report.target,
+          healthy: problems === 0,
+          summary: { problems, info: report.findings.length - problems },
+          findings: report.findings,
+        },
+        null,
+        2,
+      ),
+    );
+  } else printDiagnosis(deps, report.target, report.findings);
+  return problems === 0 ? 0 : EXIT_PROBLEMS;
+}
+
 const csv = (value: string): string[] =>
   value
     .split(',')
@@ -369,6 +424,17 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
         void (exitCode = await guarded(deps, () => runList(deps, kind, opts))),
     );
 
+  program
+    .command('doctor')
+    .description('Diagnose the installed items and suggest fixes (exit 4 when problems exist)')
+    .addOption(new Option('--scope <scope>', 'only diagnose this scope (default: both)').choices(['project', 'user']))
+    .option('--source <folder>', 'compare against a catalog folder instead of the bundled one')
+    .option('--json', 'print one versioned JSON document')
+    .action(
+      async (opts: { scope?: Scope; source?: string; json?: boolean }) =>
+        void (exitCode = await guarded(deps, () => runDoctor(deps, opts))),
+    );
+
   // Started before dispatch so the lookup overlaps the command; checkForUpdate never rejects.
   const pending = deps.updates
     ? checkForUpdate(
@@ -380,6 +446,7 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
         },
       )
     : undefined;
+
   try {
     await program.parseAsync(argv);
   } catch (e) {
