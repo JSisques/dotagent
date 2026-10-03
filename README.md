@@ -44,6 +44,7 @@ Requires Node `>=22.13`. After a global install the command is just `shitaku`.
 - [Catalog](#catalog)
 - [Usage](#usage)
 - [Custom catalogs and trust](#custom-catalogs-and-trust)
+- [Update notifications](#update-notifications)
 - [Known limitation](#known-limitation)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
@@ -204,6 +205,18 @@ Invalid skills, MCPs and profiles are skipped with a `warning: skipped <file>: <
 ### Custom catalogs and trust
 
 `--source <folder>` reads a catalog from a folder instead of the bundled one. Treat it as code you run: stdio entries in a catalog are written to your config and Claude Code executes their `command` later. Skills from a `--source` folder are copied into your skills directory, and Claude Code may follow their instructions or run their scripts. Only use folders you trust.
+
+### Update notifications
+
+After a command finishes, shitaku prints one line on stderr when a newer version is published on npm:
+
+```
+Update available: shitaku 0.2.0 -> 0.3.0. Run: npm install -g @jsisques/shitaku
+```
+
+The registry is asked at most once every 24 hours (the answer is cached in `~/.claude/.shitaku/update-check.json`) and the lookup gives up after 1.5 seconds, so offline runs are never blocked. stdout is never touched, so `status --json` stays valid JSON, and the exit code does not change.
+
+The check is skipped entirely when `CI` is set to a non-empty value, when stdout or stderr is not a terminal, or when `SHITAKU_NO_UPDATE_CHECK` is `1`, `true` or `yes` (case-insensitive). No request is made and nothing is written in those cases.
 
 ### Known limitation
 
