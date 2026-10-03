@@ -104,6 +104,9 @@ shitaku init --mcps github --scope user --dry-run
 # Restore the files changed by the last install
 shitaku undo [--id <id>] [--force] [--dry-run]
 
+# Browse what a catalog offers (read-only)
+shitaku list [mcps|skills|profiles] [--search <text>] [--source <folder>] [--json]
+
 # Report what shitaku installed and whether it changed (read-only)
 shitaku status [--scope project|user] [--source <folder>] [--json]
 ```
@@ -165,6 +168,38 @@ In `--json` every item carries `kind` instead. For an MCP only its own entry is 
 `status` exits `0` whenever it runs, even when items drifted, so check the states (or the JSON) rather than the exit code. A corrupt manifest prints an `error:` and exits `1`; the same now holds for `init` and `undo`.
 
 Limitation: `status` compares against the bundled catalog unless you pass `--source`. An item installed with `init --source ./mine` shows as `missing-from-catalog` (or `out-of-date`) unless you run `status --source ./mine`.
+
+### List
+
+`shitaku list` shows what a catalog offers and never writes anything. Pass one kind (`mcps`, `skills` or `profiles`, plural only) to narrow it; without one all three kinds are listed. `--search <text>` keeps items whose name or description contains the text, ignoring case, and combines with the kind. `--source <folder>` lists a custom catalog instead of the bundled one.
+
+The text output is grouped by kind (`mcps`, `profiles`, `skills`), sorted by name, with one aligned name column. Descriptions are collapsed onto one line, and a profile without a description prints its name only:
+
+```
+mcps:
+  context7       Up-to-date library documentation for coding agents
+  github         GitHub remote MCP server (repositories, issues, pull requests)
+profiles:
+  base           Essentials for any project
+  web            Web development
+skills:
+  example-skill  Minimal example skill that shows the catalog skill layout.
+```
+
+When nothing matches it prints `no matching items`.
+
+`--json` prints one document, `{ "version": 1, "items": [{ "kind", "name", "description" }] }`. Later changes to its shape are additive.
+
+| Field         | Type           | Notes                                                 |
+| ------------- | -------------- | ----------------------------------------------------- |
+| `version`     | number         | Always `1`                                            |
+| `kind`        | string         | `mcp`, `profile` or `skill` (singular, like `status`) |
+| `name`        | string         | Item name                                             |
+| `description` | string or null | Raw text; `null` for a profile without one            |
+
+`items` is flat and sorted by kind, then name; an empty result is `"items": []`. Whitespace in descriptions is collapsed only in text mode.
+
+Invalid skills, MCPs and profiles are skipped with a `warning: skipped <file>: <reason>` line on stderr (in both modes), so stdout stays valid JSON. Exit codes: `0` ok, including no matches; `1` for an invalid kind or a catalog that cannot be loaded (`error: cannot load catalog from <where>: <message>`).
 
 ### Custom catalogs and trust
 

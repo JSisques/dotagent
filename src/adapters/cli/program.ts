@@ -1,4 +1,4 @@
-import { Command, CommanderError, Option } from 'commander';
+import { Argument, Command, CommanderError, Option } from 'commander';
 import {
   planInit,
   applyPlan,
@@ -8,8 +8,10 @@ import {
   UnknownSkillError,
 } from '@/application/init-mcps.js';
 import type { InitDeps } from '@/application/init-mcps.js';
+import { CatalogLoadError, listCatalog } from '@/application/list-catalog.js';
 import { getStatus, type StatusReport } from '@/application/status.js';
 import { undoInstall, UndoSelectionError, UndoVerifyError } from '@/application/undo-install.js';
+import { collapseWhitespace, LIST_KINDS, type CatalogEntry, type ListKind } from '@/domain/catalog/listing.js';
 import { ConfigError } from '@/domain/json-merge.js';
 import { ManifestError } from '@/domain/manifest.js';
 import type { ChangePlan } from '@/domain/plan/change-plan.js';
@@ -44,11 +46,50 @@ interface InitOptions {
   force?: boolean;
 }
 
+interface ListOptions {
+  search?: string;
+  source?: string;
+  json?: boolean;
+}
+
 /** Exit codes: 0 ok, 1 error, 2 unresolved conflicts, 3 undo refused. */
 const EXIT_CONFLICT = 2;
 
 /** Version of the `status --json` document; later changes to its shape must be additive. */
 const STATUS_JSON_VERSION = 1;
+
+/** Version of the `list --json` document; later changes to its shape must be additive. */
+const LIST_JSON_VERSION = 1;
+
+function printList(deps: CliDeps, items: CatalogEntry[]): void {
+  if (items.length === 0) {
+    deps.out('no matching items');
+    return;
+  }
+  const width = Math.max(...items.map((i) => i.name.length));
+  let kind: string | undefined;
+  for (const item of items) {
+    if (item.kind !== kind) deps.out(`${(kind = item.kind)}s:`);
+    const description = item.description === null ? '' : collapseWhitespace(item.description);
+    deps.out(description === '' ? `  ${item.name}` : `  ${item.name.padEnd(width)}  ${description}`);
+  }
+}
+
+async function runList(deps: CliDeps, kind: ListKind | undefined, opts: ListOptions): Promise<number> {
+  let report;
+  try {
+    report = await listCatalog({ source: deps.makeSource(opts.source) }, { kind, search: opts.search });
+  } catch (e) {
+    if (!(e instanceof CatalogLoadError)) throw e;
+    deps.err(`error: cannot load catalog from ${opts.source ?? 'the bundled catalog'}: ${e.message}`);
+    return 1;
+  }
+  // Catalog problems go to stderr in both modes so `--json` keeps stdout parseable.
+  for (const issue of report.issues) deps.err(`warning: skipped ${issue.file}: ${issue.reason}`);
+  if (opts.json) deps.out(JSON.stringify({ version: LIST_JSON_VERSION, items: report.items }, null, 2));
+  else printList(deps, report.items);
+  return 0;
+}
 
 function printPlan(deps: CliDeps, plan: ChangePlan): void {
   const row = (name: string, action: string, reason?: string): string =>
@@ -252,6 +293,18 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
     .action(
       async (opts: { scope?: Scope; source?: string; json?: boolean }) =>
         void (exitCode = await guarded(deps, () => runStatus(deps, opts))),
+    );
+
+  program
+    .command('list')
+    .description('List the MCPs, skills and profiles a catalog offers')
+    .addArgument(new Argument('[kind]', 'only list this kind').choices(LIST_KINDS))
+    .option('--search <text>', 'only items whose name or description contains this text (case-insensitive)')
+    .option('--source <folder>', 'list a catalog folder instead of the bundled one')
+    .option('--json', 'print one versioned JSON document')
+    .action(
+      async (kind: ListKind | undefined, opts: ListOptions) =>
+        void (exitCode = await guarded(deps, () => runList(deps, kind, opts))),
     );
 
   try {

@@ -516,4 +516,208 @@ describe('runCli', () => {
       });
     });
   });
+
+  describe('list', () => {
+    interface Entry {
+      name: string;
+      description?: string;
+    }
+    /** Writes a folder catalog; profiles have no skills or MCPs of their own, so they always resolve. */
+    const writeCatalog = async (
+      name: string,
+      items: { mcps?: Entry[]; skills?: Entry[]; profiles?: Entry[] },
+    ): Promise<string> => {
+      const dir = join(tmp.root, name);
+      const { mcps = [], skills = [], profiles = [] } = items;
+      await mkdir(join(dir, 'mcps'), { recursive: true });
+      await mkdir(join(dir, 'profiles'), { recursive: true });
+      await writeFile(
+        join(dir, 'catalog.json'),
+        JSON.stringify({
+          version: 1,
+          items: {
+            mcps: mcps.map((m) => m.name),
+            skills: skills.map((s) => s.name),
+            profiles: profiles.map((p) => p.name),
+          },
+        }),
+      );
+      for (const m of mcps) {
+        const server = { type: 'stdio', command: 'x' };
+        await writeFile(join(dir, 'mcps', `${m.name}.json`), JSON.stringify({ ...m, server }));
+      }
+      for (const s of skills) {
+        await mkdir(join(dir, 'skills', s.name), { recursive: true });
+        await writeFile(
+          join(dir, 'skills', s.name, 'SKILL.md'),
+          `---\nname: ${s.name}\ndescription: ${s.description ?? ''}\n---\n`,
+        );
+      }
+      for (const p of profiles) await writeFile(join(dir, 'profiles', `${p.name}.json`), JSON.stringify(p));
+      return dir;
+    };
+    const fullCatalog = () =>
+      writeCatalog('full', {
+        mcps: [
+          { name: 'github-tools', description: 'GitHub\n  tools' },
+          { name: 'fs', description: 'Filesystem access' },
+        ],
+        skills: [{ name: 'demo', description: 'Browser automation' }],
+        profiles: [{ name: 'web', description: 'Web setup' }, { name: 'base' }],
+      });
+
+    it('rejects an invalid kind with the allowed choices, exit 1 and empty stdout', async () => {
+      expect(await run('list', 'bogus')).toBe(1);
+      expect(err.join('\n')).toContain('Allowed choices');
+      expect(out).toEqual([]);
+    });
+
+    describe('text', () => {
+      it('groups by kind with one aligned name column, collapsed descriptions and name-only profiles', async () => {
+        expect(await run('list', '--source', await fullCatalog())).toBe(0);
+        expect(out).toEqual([
+          'mcps:',
+          '  fs            Filesystem access',
+          '  github-tools  GitHub tools',
+          'profiles:',
+          '  base',
+          '  web           Web setup',
+          'skills:',
+          '  demo          Browser automation',
+        ]);
+        expect(err).toEqual([]);
+      });
+
+      it('lists only the requested kind', async () => {
+        expect(await run('list', 'skills', '--source', await fullCatalog())).toBe(0);
+        expect(out).toEqual(['skills:', '  demo  Browser automation']);
+      });
+
+      it('lists only profiles when asked, printing a profile without description as its name', async () => {
+        expect(await run('list', 'profiles', '--source', await fullCatalog())).toBe(0);
+        expect(out).toEqual(['profiles:', '  base', '  web   Web setup']);
+      });
+
+      it('searches descriptions case-insensitively', async () => {
+        expect(await run('list', '--search', 'BROWSER', '--source', await fullCatalog())).toBe(0);
+        expect(out).toEqual(['skills:', '  demo  Browser automation']);
+      });
+
+      it('searches names and combines with the kind filter', async () => {
+        const dir = await writeCatalog('search', {
+          mcps: [{ name: 'fs', description: 'Files' }],
+          skills: [{ name: 'fs-tips', description: 'Tips' }],
+        });
+        expect(await run('list', '--search', 'fs', '--source', dir)).toBe(0);
+        expect(out).toEqual(['mcps:', '  fs       Files', 'skills:', '  fs-tips  Tips']);
+        out = [];
+        expect(await run('list', 'mcps', '--search', 'fs', '--source', dir)).toBe(0);
+        expect(out).toEqual(['mcps:', '  fs  Files']);
+      });
+
+      it('prints no matching items and exits 0 when nothing matches', async () => {
+        expect(await run('list', '--search', 'zzz-nothing', '--source', await fullCatalog())).toBe(0);
+        expect(out).toEqual(['no matching items']);
+      });
+
+      it('lists the bundled catalog with a header per kind', async () => {
+        expect(await run('list')).toBe(0);
+        expect(out.filter((l) => !l.startsWith(' '))).toEqual(['mcps:', 'profiles:', 'skills:']);
+        expect(out).toContainEqual(expect.stringMatching(/^ {2}github\s+\S/));
+      });
+    });
+
+    describe('--json', () => {
+      it('prints one versioned document with flat items sorted by kind then name', async () => {
+        expect(await run('list', '--json', '--source', await fullCatalog())).toBe(0);
+        expect(out).toHaveLength(1);
+        expect(JSON.parse(out[0] ?? '')).toEqual({
+          version: 1,
+          items: [
+            { kind: 'mcp', name: 'fs', description: 'Filesystem access' },
+            { kind: 'mcp', name: 'github-tools', description: 'GitHub\n  tools' },
+            { kind: 'profile', name: 'base', description: null },
+            { kind: 'profile', name: 'web', description: 'Web setup' },
+            { kind: 'skill', name: 'demo', description: 'Browser automation' },
+          ],
+        });
+        expect(out[0]).toContain('\n  "version": 1');
+        expect(err).toEqual([]);
+      });
+
+      it('applies the kind filter and search', async () => {
+        expect(await run('list', 'profiles', '--json', '--search', 'web', '--source', await fullCatalog())).toBe(0);
+        expect(JSON.parse(out.join('\n'))).toEqual({
+          version: 1,
+          items: [{ kind: 'profile', name: 'web', description: 'Web setup' }],
+        });
+      });
+
+      it('prints an empty items list and exits 0 when nothing matches', async () => {
+        expect(await run('list', '--json', '--search', 'zzz-nothing', '--source', await fullCatalog())).toBe(0);
+        expect(JSON.parse(out.join('\n'))).toEqual({ version: 1, items: [] });
+      });
+
+      it('warns on stderr about skipped entries while stdout stays parseable', async () => {
+        const dir = await writeCatalog('partial', { mcps: [{ name: 'ok', description: 'Fine' }] });
+        await writeFile(join(dir, 'catalog.json'), JSON.stringify({ version: 1, items: { mcps: ['ok', 'ghost'] } }));
+        await writeFile(join(dir, 'mcps', 'ghost.json'), '{ not json');
+        expect(await run('list', '--json', '--source', dir)).toBe(0);
+        expect(err.join('\n')).toMatch(/^warning: skipped mcps\/ghost\.json: /);
+        expect(JSON.parse(out.join('\n'))).toEqual({
+          version: 1,
+          items: [{ kind: 'mcp', name: 'ok', description: 'Fine' }],
+        });
+      });
+    });
+
+    describe('load failure', () => {
+      it.each(['text', 'json'])(
+        'explains a missing source folder in %s mode and prints nothing on stdout',
+        async (mode) => {
+          const missing = join(tmp.root, 'nope');
+          const args = mode === 'json' ? ['--json'] : [];
+          expect(await run('list', ...args, '--source', missing)).toBe(1);
+          expect(err).toHaveLength(1);
+          expect(err[0]).toMatch(new RegExp(`^error: cannot load catalog from ${missing}: \\S`));
+          expect(out).toEqual([]);
+        },
+      );
+
+      it('explains a malformed catalog.json instead of a stack trace', async () => {
+        const dir = join(tmp.root, 'broken');
+        await mkdir(dir);
+        await writeFile(join(dir, 'catalog.json'), '{ not json');
+        expect(await run('list', '--source', dir)).toBe(1);
+        expect(err[0]).toContain(`error: cannot load catalog from ${dir}: `);
+        expect(text()).not.toMatch(/\n\s+at /);
+        expect(out).toEqual([]);
+      });
+    });
+
+    it('lists a name used by both an MCP and a skill in both groups', async () => {
+      const dir = await writeCatalog('dupes', {
+        mcps: [{ name: 'shared', description: 'As MCP' }],
+        skills: [{ name: 'shared', description: 'As skill' }],
+      });
+      expect(await run('list', '--source', dir)).toBe(0);
+      expect(out).toEqual(['mcps:', '  shared  As MCP', 'skills:', '  shared  As skill']);
+    });
+
+    it('never writes to the project or home directory', async () => {
+      expect(await run('list', '--source', await fullCatalog())).toBe(0);
+      expect(await run('list', '--json')).toBe(0);
+      expect(await readdir(tmp.cwd)).toEqual([]);
+      expect(await readdir(tmp.homeDir)).toEqual([]);
+    });
+
+    it('warns on stderr about skipped entries in text mode and still lists the rest', async () => {
+      const dir = await writeCatalog('partial-text', { mcps: [{ name: 'ok', description: 'Fine' }] });
+      await writeFile(join(dir, 'catalog.json'), JSON.stringify({ version: 1, items: { mcps: ['ok', 'ghost'] } }));
+      await writeFile(join(dir, 'mcps', 'ghost.json'), '{ not json');
+      expect(await run('list', '--source', dir)).toBe(0);
+      expect(err.join('\n')).toMatch(/^warning: skipped mcps\/ghost\.json: /);
+      expect(out).toEqual(['mcps:', '  ok  Fine']);
+    });
+  });
 });

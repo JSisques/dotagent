@@ -116,4 +116,4 @@ No migration required.
 
 ## Open Questions
 
-- [ ] Confirm with the spec that JSON `kind` values are singular and group order is `mcp`, `profile`, `skill`.
+- [x] Confirm with the spec that JSON `kind` values are singular and group order is `mcp`, `profile`, `skill`.

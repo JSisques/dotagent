@@ -9,11 +9,11 @@
 | Chained PRs recommended | Yes                                             |
 | Suggested split         | PR 1 (domain + use case) -> PR 2 (CLI + README) |
 | Delivery strategy       | ask-on-risk                                     |
-| Chain strategy          | pending                                         |
+| Chain strategy          | stacked-to-main                                 |
 
-Decision needed before apply: Yes
+Decision needed before apply: No (resolved: 2 chained PRs)
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: stacked-to-main
 400-line budget risk: Medium
 
 ### Suggested Work Units
@@ -27,7 +27,7 @@ Note: task 1.1 is written first but lands in PR 2 (it fails without the command)
 
 ## Phase 1: Pin invalid kind (RED)
 
-- [ ] 1.1 In `test/adapters/cli/program.test.ts` add `describe('list')`: `list bogus` returns 1, stderr has `Allowed choices`, stdout empty (spec: Invalid kind).
+- [x] 1.1 In `test/adapters/cli/program.test.ts` add `describe('list')`: `list bogus` returns 1, stderr has `Allowed choices`, stdout empty (spec: Invalid kind).
 
 ## Phase 2: Domain (RED then GREEN)
 
@@ -41,18 +41,18 @@ Note: task 1.1 is written first but lands in PR 2 (it fails without the command)
 
 ## Phase 4: CLI (RED then GREEN, by group)
 
-- [ ] 4.1 RED: text output via `--source` fixture: exact aligned lines, name-only profile, collapsed multi-line description, kind filter, `--search` (name, description, combined with kind), `no matching items` exit 0; one bundled-catalog structure smoke test.
-- [ ] 4.2 GREEN: in `src/adapters/cli/program.ts` add `list` command with `Argument('[kind]').choices(LIST_KINDS)`, `runList`, `printList`. Makes 1.1 and 4.1 pass.
-- [ ] 4.3 RED: `--json` tests: single document, `version: 1`, sorted flat items, `description: null`, empty `items: []`; skipped entry warns on stderr while stdout parses.
-- [ ] 4.4 GREEN: add `LIST_JSON_VERSION` and JSON branch plus `warning: skipped <file>: <reason>` stderr output in `runList`.
-- [ ] 4.5 RED: missing folder and malformed `catalog.json` exit 1 with `error: cannot load catalog from <where>: <msg>`; same name as MCP and skill appears in both groups; `tmp.cwd` and `tmp.homeDir` stay empty.
-- [ ] 4.6 GREEN: catch `CatalogLoadError` in `runList` (other errors propagate via `guarded()`).
-- [ ] 4.7 REFACTOR: tidy `program.ts` and tests; confirm `test/architecture.test.ts` passes.
+- [x] 4.1 RED: text output via `--source` fixture: exact aligned lines, name-only profile, collapsed multi-line description, kind filter, `--search` (name, description, combined with kind), `no matching items` exit 0; one bundled-catalog structure smoke test.
+- [x] 4.2 GREEN: in `src/adapters/cli/program.ts` add `list` command with `Argument('[kind]').choices(LIST_KINDS)`, `runList`, `printList`. Makes 1.1 and 4.1 pass.
+- [x] 4.3 RED: `--json` tests: single document, `version: 1`, sorted flat items, `description: null`, empty `items: []`; skipped entry warns on stderr while stdout parses.
+- [x] 4.4 GREEN: add `LIST_JSON_VERSION` and JSON branch plus `warning: skipped <file>: <reason>` stderr output in `runList`.
+- [x] 4.5 RED: missing folder and malformed `catalog.json` exit 1 with `error: cannot load catalog from <where>: <msg>`; same name as MCP and skill appears in both groups; `tmp.cwd` and `tmp.homeDir` stay empty.
+- [x] 4.6 GREEN: catch `CatalogLoadError` in `runList` (other errors propagate via `guarded()`).
+- [x] 4.7 REFACTOR: tidy `program.ts` and tests; confirm `test/architecture.test.ts` passes.
 
 ## Phase 5: Docs
 
-- [ ] 5.1 `README.md`: usage line, `### List` section, JSON shape table (additive-change note, like `status`).
+- [x] 5.1 `README.md`: usage line, `### List` section, JSON shape table (additive-change note, like `status`).
 
 ## Phase 6: Verification
 
-- [ ] 6.1 Run `pnpm run typecheck`, `pnpm run lint`, `pnpm run format:check`, `pnpm run test`, `pnpm run build`; all green.
+- [x] 6.1 Run `pnpm run typecheck`, `pnpm run lint`, `pnpm run format:check`, `pnpm run test`, `pnpm run build`; all green.
