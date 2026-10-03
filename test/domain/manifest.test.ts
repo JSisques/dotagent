@@ -48,6 +48,93 @@ const skillInstall = (id: string, root: string, entryHash: string, over: Partial
 
 const manifest = (installs: Install[]): Manifest => ({ version: 1, installs });
 
+const removeInstall = (id: string, name: string, over: Partial<Install> = {}): Install => ({
+  ...install(id, name, 'observed'),
+  files: [
+    {
+      path: '/p/.mcp.json',
+      scope: 'project',
+      backup: 'backups/x/0-.mcp.json',
+      beforeHash: 'before',
+      afterHash: 'after2',
+      items: [{ kind: 'mcp', name, action: 'remove', entryHash: 'observed' }],
+    },
+  ],
+  ...over,
+});
+
+const removeSkillInstall = (id: string, root: string, over: Partial<Install> = {}): Install => ({
+  ...skillInstall(id, root, 'observed'),
+  files: ['SKILL.md', 'notes.md'].map((f) => ({
+    path: `${root}/${f}`,
+    scope: 'user' as const,
+    backup: `backups/${id}/${f}`,
+    beforeHash: 'h',
+    afterHash: null,
+    items: [
+      {
+        kind: 'skill' as const,
+        name: root.split('/').pop() ?? '',
+        action: 'remove' as const,
+        entryHash: 'observed',
+        root,
+      },
+    ],
+  })),
+  createdDirs: [],
+  ...over,
+});
+
+describe('remove action replay', () => {
+  const root = '/h/.claude/skills/demo';
+  const undoneAt = '2026-10-03T00:00:00.000Z';
+
+  it('an MCP remove drops only the removed entry from ownership', () => {
+    const m = manifest([install('a', 'github', 'h1'), install('b', 'fs', 'h2'), removeInstall('c', 'github')]);
+    expect(deriveOwnership(m)).toEqual({ '/p/.mcp.json': { fs: 'h2' } });
+    expect(deriveOwnership(manifest([install('a', 'github', 'h1'), removeInstall('c', 'github')]))).toEqual({
+      '/p/.mcp.json': {},
+    });
+  });
+
+  it('a reinstall after a remove owns the item again', () => {
+    const m = manifest([install('a', 'github', 'h1'), removeInstall('b', 'github'), install('c', 'github', 'h3')]);
+    expect(deriveOwnership(m)['/p/.mcp.json']).toEqual({ github: 'h3' });
+    expect(deriveOwnedItems(m).map((o) => [o.name, o.hash, o.installId])).toEqual([['github', 'h3', 'c']]);
+  });
+
+  it('an undone uninstall leaves the earlier install owning the item', () => {
+    const m = manifest([install('a', 'github', 'h1'), removeInstall('b', 'github', { undoneAt })]);
+    expect(deriveOwnership(m)['/p/.mcp.json']).toEqual({ github: 'h1' });
+    expect(deriveOwnedItems(m).map((o) => [o.name, o.hash])).toEqual([['github', 'h1']]);
+  });
+
+  it('deriveOwnedItems drops a removed MCP', () => {
+    expect(deriveOwnedItems(manifest([install('a', 'github', 'h1'), removeInstall('b', 'github')]))).toEqual([]);
+  });
+
+  it('a skill remove drops the root from skill ownership and owned items', () => {
+    const m = manifest([skillInstall('a', root, 'tree1'), removeSkillInstall('b', root)]);
+    expect(deriveSkillOwnership(m)).toEqual({});
+    expect(deriveOwnedItems(m)).toEqual([]);
+  });
+
+  it('skill remove then reinstall, and undone skill uninstall', () => {
+    const steps = [skillInstall('a', root, 'tree1'), removeSkillInstall('b', root), skillInstall('c', root, 'tree3')];
+    expect(deriveSkillOwnership(manifest(steps))).toEqual({ [root]: 'tree3' });
+    const undone = manifest([skillInstall('a', root, 'tree1'), removeSkillInstall('b', root, { undoneAt })]);
+    expect(deriveSkillOwnership(undone)).toEqual({ [root]: 'tree1' });
+    expect(deriveOwnedItems(undone).map((o) => o.hash)).toEqual(['tree1']);
+  });
+
+  it('parses a remove action for MCPs and skills, keeping manifest version 1', () => {
+    const m = manifest([install('a', 'github', 'h1'), removeInstall('b', 'github'), removeSkillInstall('c', root)]);
+    const parsed = parseManifest(JSON.stringify(m));
+    expect(parsed).toEqual(m);
+    expect(parsed.version).toBe(1);
+  });
+});
+
 describe('deriveOwnership', () => {
   it('is empty for an empty manifest', () => {
     expect(deriveOwnership(emptyManifest())).toEqual({});

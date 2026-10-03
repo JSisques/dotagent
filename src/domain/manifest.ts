@@ -7,13 +7,13 @@ const ItemSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('mcp'),
     name: z.string(),
-    action: z.enum(['create', 'update']),
+    action: z.enum(['create', 'update', 'remove']),
     entryHash: z.string(),
   }),
   z.object({
     kind: z.literal('skill'),
     name: z.string(),
-    action: z.enum(['create', 'update']),
+    action: z.enum(['create', 'update', 'remove']),
     /** Tree hash of the skill as installed. */
     entryHash: z.string(),
     /** Absolute path of the skill directory. */
@@ -76,7 +76,9 @@ export function deriveOwnership(manifest: Manifest): Ownership {
   for (const install of manifest.installs.filter((i) => i.undoneAt === null)) {
     for (const file of install.files) {
       for (const item of file.items) {
-        if (item.kind === 'mcp') (owned[file.path] ??= {})[item.name] = item.entryHash;
+        if (item.kind !== 'mcp') continue;
+        if (item.action === 'remove') delete owned[file.path]?.[item.name];
+        else (owned[file.path] ??= {})[item.name] = item.entryHash;
       }
     }
   }
@@ -88,7 +90,11 @@ export function deriveSkillOwnership(manifest: Manifest): Record<string, string>
   const owned: Record<string, string> = {};
   for (const install of manifest.installs.filter((i) => i.undoneAt === null)) {
     for (const file of install.files) {
-      for (const item of file.items) if (item.kind === 'skill') owned[item.root] = item.entryHash;
+      for (const item of file.items) {
+        if (item.kind !== 'skill') continue;
+        if (item.action === 'remove') delete owned[item.root];
+        else owned[item.root] = item.entryHash;
+      }
     }
   }
   return owned;
@@ -113,6 +119,10 @@ export function deriveOwnedItems(manifest: Manifest): OwnedItem[] {
       for (const item of file.items) {
         const path = item.kind === 'skill' ? item.root : file.path;
         const key = JSON.stringify([file.scope, path, item.name]);
+        if (item.action === 'remove') {
+          owned.delete(key);
+          continue;
+        }
         owned.set(key, {
           kind: item.kind,
           scope: file.scope,

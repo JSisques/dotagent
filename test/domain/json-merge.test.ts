@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sha256 } from '@/domain/hash.js';
-import { ConfigError, detectIndent, mergeAtPath, readAtPath } from '@/domain/json-merge.js';
+import { ConfigError, detectIndent, mergeAtPath, readAtPath, removeAtPath } from '@/domain/json-merge.js';
 import { parseDoc } from '@test/helpers/parse-doc.js';
 
 const KEY = ['mcpServers'];
@@ -43,6 +43,38 @@ describe('json-merge', () => {
   it('reads the servers map, empty when absent', () => {
     expect(readAtPath(null, KEY)).toEqual({});
     expect(readAtPath('{"mcpServers":{"a":{"x":1}}}', KEY)).toEqual({ a: { x: 1 } });
+  });
+});
+
+describe('removeAtPath', () => {
+  it('removes only the named entries and keeps siblings, key order, indent and trailing newline', () => {
+    const doc = { theme: 'dark', mcpServers: { a: { x: 1 }, github: { y: 2 }, b: { z: 3 } }, last: [1] };
+    const out = removeAtPath(JSON.stringify(doc, null, 4) + '\n', KEY, ['github']);
+    const parsed = parseDoc(out);
+    expect(Object.keys(parsed)).toEqual(['theme', 'mcpServers', 'last']);
+    expect(Object.keys(parsed.mcpServers)).toEqual(['a', 'b']);
+    expect(out).toContain('\n    "theme"');
+    expect(out.endsWith('}\n')).toBe(true);
+  });
+
+  it('keeps a missing trailing newline and tab indentation, and leaves an emptied object as {}', () => {
+    const out = removeAtPath('{\n\t"mcpServers": {\n\t\t"github": {}\n\t}\n}', KEY, ['github']);
+    expect(JSON.parse(out)).toEqual({ mcpServers: {} });
+    expect(out).toContain('\n\t"mcpServers"');
+    expect(out.endsWith('}')).toBe(true);
+  });
+
+  it('ignores names and key paths that are absent', () => {
+    const before = '{\n  "mcpServers": { "a": {} }\n}\n';
+    expect(JSON.parse(removeAtPath(before, KEY, ['nope']))).toEqual({ mcpServers: { a: {} } });
+    expect(JSON.parse(removeAtPath('{"x":1}', KEY, ['a']))).toEqual({ x: 1 });
+  });
+
+  it('aborts on corrupt JSON or a non-object at the key path', () => {
+    expect(() => removeAtPath('{ nope', KEY, ['a'])).toThrow(ConfigError);
+    expect(() => removeAtPath('[]', KEY, ['a'])).toThrow(ConfigError);
+    expect(() => removeAtPath('{"mcpServers": []}', KEY, ['a'])).toThrow(ConfigError);
+    expect(() => removeAtPath('{"mcpServers": 3}', KEY, ['a'])).toThrow(ConfigError);
   });
 });
 
