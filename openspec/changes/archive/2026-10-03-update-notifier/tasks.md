@@ -38,19 +38,19 @@ Chain strategy: pending
 
 ## Phase 3: npm adapter (PR 2)
 
-- [ ] 3.1 RED: `test/adapters/npm/registry-version-source.test.ts` with fake `fetchFn`: URL `@jsisques%2Fshitaku/latest`, ok payload, non-ok, bad JSON, schema miss, rejected fetch, abort.
-- [ ] 3.2 GREEN: create `src/adapters/npm/registry-version-source.ts`.
+- [x] 3.1 RED: `test/adapters/npm/registry-version-source.test.ts` with fake `fetchFn`: URL `@jsisques%2Fshitaku/latest`, ok payload, non-ok, bad JSON, schema miss, rejected fetch, abort.
+- [x] 3.2 GREEN: create `src/adapters/npm/registry-version-source.ts`.
 
 ## Phase 4: CLI wiring (PR 2)
 
-- [ ] 4.1 RED: extend `test/adapters/cli/program.test.ts`: notice on stderr after command; none when same version; `status --json` stdout unchanged; exit code unchanged (including failing command); no `updates` means no check.
-- [ ] 4.2 GREEN: modify `src/adapters/cli/program.ts` (`UpdateSettings`, start before dispatch, await after, print via `deps.err`).
-- [ ] 4.3 Modify `src/main.ts`: read version via `readFileSync(new URL('../package.json', import.meta.url))`, compute `interactive` (stdout and stderr TTY), wire adapter; omit `updates` if version unreadable.
-- [ ] 4.4 REFACTOR; confirm `test/naming.test.ts` and `test/architecture.test.ts` still pass.
+- [x] 4.1 RED: extend `test/adapters/cli/program.test.ts`: notice on stderr after command; none when same version; `status --json` stdout unchanged; exit code unchanged (including failing command); no `updates` means no check.
+- [x] 4.2 GREEN: modify `src/adapters/cli/program.ts` (`UpdateSettings`, start before dispatch, await after, print via `deps.err`).
+- [x] 4.3 Modify `src/main.ts`: read version via `readFileSync(new URL('../package.json', import.meta.url))`, compute `interactive` (stdout and stderr TTY), wire adapter; omit `updates` if version unreadable.
+- [x] 4.4 REFACTOR; confirm `test/naming.test.ts` and `test/architecture.test.ts` still pass.
 
 ## Phase 5: Docs and verification (PR 2)
 
-- [ ] 5.1 Modify `README.md`: "Update notifications" section (notice, 24h cache, `CI` and non-TTY skips, `SHITAKU_NO_UPDATE_CHECK` values `1`/`true`/`yes`, stderr only).
-- [ ] 5.2 Manual: `curl -s 'https://registry.npmjs.org/@jsisques%2Fshitaku/latest'` returns JSON with `version`.
-- [ ] 5.3 Run `pnpm run typecheck`, `pnpm run lint`, `pnpm run format:check`, `pnpm run test`, `pnpm run build`; all green.
-- [ ] 5.4 Conventional commits per unit, no AI attribution.
+- [x] 5.1 Modify `README.md`: "Update notifications" section (notice, 24h cache, `CI` and non-TTY skips, `SHITAKU_NO_UPDATE_CHECK` values `1`/`true`/`yes`, stderr only).
+- [x] 5.2 Manual: `curl -s 'https://registry.npmjs.org/@jsisques%2Fshitaku/latest'` returns JSON with `version`.
+- [x] 5.3 Run `pnpm run typecheck`, `pnpm run lint`, `pnpm run format:check`, `pnpm run test`, `pnpm run build`; all green.
+- [x] 5.4 Conventional commits per unit, no AI attribution.

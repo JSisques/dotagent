@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Composition root: the only module that touches os.homedir, process and the package location.
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,9 +9,25 @@ import { ClackPrompter } from './adapters/cli/clack-prompter.js';
 import { runCli } from './adapters/cli/program.js';
 import { claudeCodeTarget } from './adapters/claude-code/target.js';
 import { NodeFileSystem } from './adapters/fs/node-fs.js';
+import { NpmRegistryVersionSource } from './adapters/npm/registry-version-source.js';
 
 const cwd = process.cwd();
 const bundled = fileURLToPath(new URL('../catalog/', import.meta.url));
+
+const PACKAGE_NAME = '@jsisques/shitaku';
+
+/** The installed version, or undefined when package.json is unreadable (then the update check is skipped). */
+function readVersion(): string | undefined {
+  try {
+    const pkg: unknown = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    const version = (pkg as { version?: unknown } | null)?.version;
+    return typeof version === 'string' ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const version = readVersion();
 
 process.exitCode = await runCli(process.argv, {
   makeSource: (folder) =>
@@ -22,4 +39,12 @@ process.exitCode = await runCli(process.argv, {
   prompter: new ClackPrompter(),
   out: (line) => console.log(line),
   err: (line) => console.error(line),
+  updates:
+    version === undefined
+      ? undefined
+      : {
+          source: new NpmRegistryVersionSource(PACKAGE_NAME),
+          currentVersion: version,
+          interactive: process.stdout.isTTY && process.stderr.isTTY,
+        },
 });
