@@ -56,6 +56,7 @@ describe('runCli', () => {
   let calls: string[];
   let conflicts: { kind: string; name: string; reason: string }[];
   let env: Record<string, string | undefined>;
+  let updates: CliDeps['updates'];
   const mcpFile = () => join(tmp.cwd, '.mcp.json');
   const text = () => [...out, ...err].join('\n');
 
@@ -69,6 +70,7 @@ describe('runCli', () => {
       prompter,
       out: (l) => out.push(l),
       err: (l) => err.push(l),
+      updates,
     };
     return runCli(['node', 'shitaku', ...args], deps);
   };
@@ -80,6 +82,7 @@ describe('runCli', () => {
     out = [];
     err = [];
     env = { GITHUB_TOKEN: TOKEN };
+    updates = undefined;
     usePrompter();
   });
   afterEach(() => tmp.cleanup());
@@ -718,6 +721,63 @@ describe('runCli', () => {
       expect(await run('list', '--source', dir)).toBe(0);
       expect(err.join('\n')).toMatch(/^warning: skipped mcps\/ghost\.json: /);
       expect(out).toEqual(['mcps:', '  ok  Fine']);
+    });
+  });
+
+  describe('update notice', () => {
+    const NOTICE = 'Update available: shitaku 0.2.0 -> 0.3.0. Run: npm install -g @jsisques/shitaku';
+    let asked: number;
+    const useUpdates = (latest: string | null, currentVersion = '0.2.0') => {
+      asked = 0;
+      updates = {
+        currentVersion,
+        interactive: true,
+        source: {
+          latest: () => {
+            asked++;
+            return Promise.resolve(latest);
+          },
+        },
+      };
+    };
+
+    it('prints the notice on stderr after the command, leaving stdout alone', async () => {
+      useUpdates('0.3.0');
+      expect(await run('status')).toBe(0);
+      expect(err).toEqual([NOTICE]);
+      expect(out).not.toContain(NOTICE);
+    });
+
+    it('prints nothing when already on the latest version', async () => {
+      useUpdates('0.2.0');
+      expect(await run('status')).toBe(0);
+      expect(err).toEqual([]);
+    });
+
+    it('keeps status --json stdout parseable and unchanged', async () => {
+      useUpdates('0.3.0');
+      expect(await run('status', '--json')).toBe(0);
+      expect(JSON.parse(out.join('\n'))).toEqual({
+        version: 1,
+        target: 'claude-code',
+        catalog: 'available',
+        items: [],
+      });
+      expect(err).toEqual([NOTICE]);
+    });
+
+    it('keeps the exit code of a failing command and still prints the notice', async () => {
+      useUpdates('0.3.0');
+      expect(await run('init', '--yes')).toBe(1);
+      expect(err).toEqual(['error: select at least one kind: pass --mcps and/or --skills', NOTICE]);
+    });
+
+    it('does not check without updates settings', async () => {
+      useUpdates('0.3.0');
+      updates = undefined;
+      expect(await run('status')).toBe(0);
+      expect(asked).toBe(0);
+      expect(err).toEqual([]);
     });
   });
 });

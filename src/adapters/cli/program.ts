@@ -8,6 +8,7 @@ import {
   UnknownSkillError,
 } from '@/application/init-mcps.js';
 import type { InitDeps } from '@/application/init-mcps.js';
+import { checkForUpdate } from '@/application/check-update.js';
 import { CatalogLoadError, listCatalog } from '@/application/list-catalog.js';
 import { getStatus, type StatusReport } from '@/application/status.js';
 import { undoInstall, UndoSelectionError, UndoVerifyError } from '@/application/undo-install.js';
@@ -21,6 +22,7 @@ import { UnsafeTreeError, type FileSystem } from '@/ports/file-system.js';
 import type { Paths } from '@/ports/paths.js';
 import { PromptCancelled } from '@/ports/prompter.js';
 import type { Prompter } from '@/ports/prompter.js';
+import type { LatestVersionSource } from '@/ports/version-source.js';
 
 /** Everything the CLI touches, injected by the composition root (or by tests). */
 export interface CliDeps {
@@ -34,6 +36,17 @@ export interface CliDeps {
   out(line: string): void;
   err(line: string): void;
   now?: () => Date;
+  /** Enables the update notice; when absent, no check runs. */
+  updates?: UpdateSettings;
+}
+
+/** What the update check needs beyond the shared deps: where to ask, who we are, and whether to bother. */
+export interface UpdateSettings {
+  source: LatestVersionSource;
+  currentVersion: string;
+  /** True when stdout and stderr are both terminals. */
+  interactive: boolean;
+  timeoutMs?: number;
 }
 
 interface InitOptions {
@@ -307,12 +320,25 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
         void (exitCode = await guarded(deps, () => runList(deps, kind, opts))),
     );
 
+  // Started before dispatch so the lookup overlaps the command; checkForUpdate never rejects.
+  const pending = deps.updates
+    ? checkForUpdate(
+        { fs: deps.fs, paths: deps.paths, env: deps.env, source: deps.updates.source, now: deps.now },
+        {
+          currentVersion: deps.updates.currentVersion,
+          interactive: deps.updates.interactive,
+          timeoutMs: deps.updates.timeoutMs,
+        },
+      )
+    : undefined;
   try {
     await program.parseAsync(argv);
   } catch (e) {
-    if (e instanceof CommanderError) return e.exitCode;
-    throw e;
+    if (!(e instanceof CommanderError)) throw e;
+    exitCode = e.exitCode;
   }
+  const notice = await pending;
+  if (notice) deps.err(notice);
   return exitCode;
 }
 
