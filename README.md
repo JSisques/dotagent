@@ -108,6 +108,9 @@ shitaku undo [--id <id>] [--force] [--dry-run]
 # Browse what a catalog offers (read-only)
 shitaku list [mcps|skills|profiles] [--search <text>] [--source <folder>] [--json]
 
+# Remove one installed MCP or skill (undo reverts it)
+shitaku uninstall <name> [--scope project|user] [--kind mcp|skill] [--force] [--dry-run]
+
 # Report what shitaku installed and whether it changed (read-only)
 shitaku status [--scope project|user] [--source <folder>] [--json]
 ```
@@ -116,7 +119,7 @@ Scopes: `project` writes MCPs to `./.mcp.json` and skills to `./.claude/skills/`
 
 Flags for `init`: `--mcps <a,b>`, `--skills <a,b>`, `--scope project|user`, `--source <folder>`, `--dry-run`, `--yes` (skip confirmation, needs `--scope` and at least one of `--mcps`/`--skills`), `--force` (overwrite entries and skill directories that differ). `--mcps` and `--skills` are independent and optional, but at least one kind must be selected. Interactively, the skills prompt appears only when the catalog has skills.
 
-Exit codes: `0` ok, `1` error, `2` unresolved conflicts (an existing entry with the same name differs; re-run with `--force`), `3` undo refused because a file changed since the install (use `--force`).
+Exit codes: `0` ok, `1` error, `2` unresolved conflicts (an existing entry with the same name differs; re-run with `--force`), `3` undo or uninstall refused because a file or item changed since the install (use `--force`).
 
 Secrets are written only as `${VAR}` placeholders, never as values. The plan warns, by name, about required variables that are not set. Before changing a file, shitaku backs it up under `~/.claude/.shitaku/backups/` and records the install in `~/.claude/.shitaku/manifest.json`.
 
@@ -134,9 +137,33 @@ Safety:
 - `undo` refuses (exit `3`) when a recorded file changed, or when you added a file under a skill directory, since the install. `--force` restores the recorded files and leaves unknown files alone. Directories that the install created are removed only when empty.
 - Skill symlinks (the directory, a file inside it, or a catalog file) are rejected, and the catalog and target trees are walked with limits on file count, depth, per-file size and total size.
 
-Before downgrading shitaku to a version without skills support, run `shitaku undo` for any install that included skills: older versions do not understand skill entries in the manifest.
+Before downgrading shitaku to a version without skills support, run `shitaku undo` for any install that included skills: older versions do not understand skill entries in the manifest. The same applies to `shitaku uninstall`: older versions reject the `remove` entries it records, so undo any uninstall before downgrading.
 
 Limits: skills are copied as plain files, so shitaku does not run, lint or sandbox them. There is no profile selection on the CLI yet.
+
+### Uninstall
+
+`shitaku uninstall <name>` removes one MCP server or skill that shitaku installed. It never prompts, and it only touches items shitaku owns (see `shitaku status`): a name shitaku did not install exits `1` and nothing is written, even with `--force`.
+
+```sh
+shitaku uninstall github                      # scope inferred when the name is owned in one scope
+shitaku uninstall github --scope user         # narrow when it is owned in both
+shitaku uninstall demo --kind skill           # resolve a name that is both an MCP and a skill
+shitaku uninstall github --dry-run            # print the plan, write nothing
+shitaku uninstall github --force              # remove even if the item changed since the install
+```
+
+Flags: `--scope project|user`, `--kind mcp|skill`, `--dry-run`, `--force`. If the name matches several owned items, the command exits `1` and lists the candidates (kind and scope).
+
+Exit codes: `0` removed, already absent or dry run; `1` error (not installed, ambiguous, corrupt manifest); `3` refused because the item changed since the install. Refusal prints `changed since install: <path>` and a `--force` hint, writes nothing, and also applies to `--dry-run`, so a dry run reports exactly what a real run would do.
+
+Behavior:
+
+- An MCP is removed by deleting only its entry from the config file; other servers, key order and formatting are kept. A skill has its recorded files deleted (`SKILL.md` first) and its directory removed once empty. With `--force`, files you added to a skill directory are kept, and so is the directory.
+- Every file is backed up first, and the removal is recorded as an install, so `shitaku undo` restores the previous bytes and `shitaku status` lists the item again. Undo is last-in first-out: undo the uninstall before undoing the install it removed.
+- Undoing an MCP uninstall compares the whole config file, so `undo` refuses (exit `3`) if you edited that file after the uninstall; `--force` restores it anyway.
+- An item that is owned but already gone is reported as already absent and nothing is written.
+- For user-scope MCPs, close Claude Code first: it may rewrite `~/.claude.json` while running.
 
 ### Status
 

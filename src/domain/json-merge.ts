@@ -35,6 +35,21 @@ export function readAtPath(text: string | null, keyPath: string[]): JsonObject {
   return node as JsonObject;
 }
 
+/** Deletes `names` under `keyPath`. Names or paths that are absent are ignored; every other key keeps value and order. */
+export function removeAtPath(text: string, keyPath: string[], names: string[]): string {
+  const root = parseRoot(text);
+  let node: JsonObject = root;
+  for (const key of keyPath) {
+    const next = node[key];
+    if (next === undefined) return text;
+    if (!isObject(next)) throw new ConfigError(`'${keyPath.join('.')}' must be a JSON object`);
+    node = next;
+  }
+  for (const name of names) delete node[name];
+  const trailing = text.endsWith('\n') ? '\n' : '';
+  return JSON.stringify(root, null, detectIndent(text)) + trailing;
+}
+
 /** Sets `entries` under `keyPath`. New names are appended; all other keys keep their value and order. */
 export function mergeAtPath(text: string | null, keyPath: string[], entries: JsonObject): string {
   const root = parseRoot(text);

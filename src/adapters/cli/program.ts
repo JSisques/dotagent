@@ -12,6 +12,7 @@ import { checkForUpdate } from '@/application/check-update.js';
 import { CatalogLoadError, listCatalog } from '@/application/list-catalog.js';
 import { getStatus, type StatusReport } from '@/application/status.js';
 import { undoInstall, UndoSelectionError, UndoVerifyError } from '@/application/undo-install.js';
+import { uninstallItem, UninstallSelectionError } from '@/application/uninstall-item.js';
 import { collapseWhitespace, LIST_KINDS, type CatalogEntry, type ListKind } from '@/domain/catalog/listing.js';
 import { ConfigError } from '@/domain/json-merge.js';
 import { ManifestError } from '@/domain/manifest.js';
@@ -65,7 +66,7 @@ interface ListOptions {
   json?: boolean;
 }
 
-/** Exit codes: 0 ok, 1 error, 2 unresolved conflicts, 3 undo refused. */
+/** Exit codes: 0 ok, 1 error, 2 unresolved conflicts, 3 undo or uninstall refused (item changed since install). */
 const EXIT_CONFLICT = 2;
 
 /** Version of the `status --json` document; later changes to its shape must be additive. */
@@ -229,6 +230,42 @@ async function runUndo(deps: CliDeps, opts: { id?: string; force?: boolean; dryR
   return result.exitCode;
 }
 
+interface UninstallOptions {
+  scope?: Scope;
+  kind?: 'mcp' | 'skill';
+  dryRun?: boolean;
+  force?: boolean;
+}
+
+async function runUninstall(deps: CliDeps, name: string, opts: UninstallOptions): Promise<number> {
+  const result = await uninstallItem(
+    { fs: deps.fs, target: deps.target, paths: deps.paths, now: deps.now },
+    { name, ...opts },
+  );
+  const { item } = result;
+  const label = `${item.kind} '${item.name}' (${item.scope} scope)`;
+  if ((result.status === 'removed' || result.status === 'dry-run') && item.kind === 'mcp' && item.scope === 'user')
+    deps.out('note: close Claude Code before applying, it may rewrite ~/.claude.json while running');
+  switch (result.status) {
+    case 'already-absent':
+      deps.out(`${label} is already absent; nothing to remove`);
+      break;
+    case 'refused':
+      deps.err(`changed since install: ${item.path}`);
+      deps.err('error: refusing to uninstall; re-run with --force to remove anyway');
+      break;
+    case 'dry-run':
+      deps.out(`dry run: would remove ${result.files.join(', ')}`);
+      break;
+    case 'removed':
+      deps.out(
+        `uninstalled ${label}: removed ${result.files.join(', ')} (install ${result.installId}; undo reverts it)`,
+      );
+      break;
+  }
+  return result.exitCode;
+}
+
 function printStatus(deps: CliDeps, report: StatusReport): void {
   deps.out(`target: ${report.target}`);
   if (report.catalog === 'unavailable') deps.out('catalog unavailable');
@@ -298,6 +335,18 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
     );
 
   program
+    .command('uninstall <name>')
+    .description('Remove one MCP server or skill that shitaku installed (undo reverts it)')
+    .addOption(new Option('--scope <scope>', 'scope to remove from (default: inferred)').choices(['project', 'user']))
+    .addOption(new Option('--kind <kind>', 'resolve a name that is both an MCP and a skill').choices(['mcp', 'skill']))
+    .option('--dry-run', 'show what would be removed')
+    .option('--force', 'remove even if the item changed since the install')
+    .action(
+      async (name: string, opts: UninstallOptions) =>
+        void (exitCode = await guarded(deps, () => runUninstall(deps, name, opts))),
+    );
+
+  program
     .command('status')
     .description('List the items shitaku installed and whether they changed')
     .addOption(new Option('--scope <scope>', 'only report this scope (default: both)').choices(['project', 'user']))
@@ -357,6 +406,7 @@ async function guarded(deps: CliDeps, run: () => Promise<number>): Promise<numbe
       ManifestError,
       UndoSelectionError,
       UndoVerifyError,
+      UninstallSelectionError,
       PromptCancelled,
     ];
     if (e instanceof Error && known.some((k) => e instanceof k)) {
