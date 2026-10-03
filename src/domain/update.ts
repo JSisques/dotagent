@@ -51,7 +51,7 @@ export function isNewer(current: string, candidate: string | null): boolean {
 }
 
 export function isTruthyFlag(value: string | undefined): boolean {
-  return ['1', 'true', 'yes', 'on'].includes((value ?? '').trim().toLowerCase());
+  return ['1', 'true', 'yes'].includes((value ?? '').trim().toLowerCase());
 }
 
 export function updateNotice(current: string, latest: string): string {

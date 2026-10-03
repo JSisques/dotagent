@@ -47,7 +47,7 @@ export interface UpdateCache {
 export function parseUpdateCache(text: string): UpdateCache | null;
 export function isStale(cache: UpdateCache | null, now: Date, ttlMs?: number): boolean;
 export function isNewer(current: string, candidate: string | null): boolean;
-export function isTruthyFlag(value: string | undefined): boolean; // 1,true,yes,on; case-insensitive, trimmed
+export function isTruthyFlag(value: string | undefined): boolean; // 1,true,yes; case-insensitive, trimmed
 export function updateNotice(current: string, latest: string): string;
 // "Update available: shitaku 0.2.0 -> 0.3.0. Run: npm install -g @jsisques/shitaku"
 

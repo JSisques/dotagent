@@ -48,7 +48,7 @@ describe('isTruthyFlag', () => {
     ['true', true],
     ['TRUE', true],
     [' Yes ', true],
-    ['on', true],
+    ['on', false],
     ['', false],
     ['0', false],
     ['false', false],
