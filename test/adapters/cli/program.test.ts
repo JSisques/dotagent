@@ -969,6 +969,23 @@ describe('runCli', () => {
       expect(jsonDoc().findings.map((f) => f.code)).toEqual(['skill-missing']);
     });
 
+    it('reports out-of-date as info with exit 0 using the catalog given by --source', async () => {
+      const dir = join(tmp.root, 'custom');
+      await mkdir(join(dir, 'mcps'), { recursive: true });
+      await writeFile(join(dir, 'catalog.json'), JSON.stringify({ version: 1, items: { mcps: ['mine'] } }));
+      const publish = (command: string) =>
+        writeFile(
+          join(dir, 'mcps', 'mine.json'),
+          JSON.stringify({ name: 'mine', description: 'd', server: { type: 'stdio', command } }),
+        );
+      await publish('x');
+      await run('init', '--source', dir, '--mcps', 'mine', '--scope', 'project');
+      await publish('y');
+      out = [];
+      expect(await run('doctor', '--source', dir, '--json')).toBe(0);
+      expect(jsonDoc().findings).toMatchObject([{ severity: 'info', code: 'out-of-date', name: 'mine' }]);
+    });
+
     it('never prints environment values, only names, in text or JSON', async () => {
       await install();
       env = { SENTINEL: 's3cret-sentinel-value' };
