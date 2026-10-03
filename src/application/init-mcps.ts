@@ -1,5 +1,4 @@
-import { randomBytes } from 'node:crypto';
-import { basename, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { hashEntry, sha256 } from '@/domain/hash.js';
 import type { McpItem } from '@/domain/catalog/schema.js';
 import type { Install, Manifest } from '@/domain/manifest.js';
@@ -11,6 +10,14 @@ import type { AgentTarget, Scope } from '@/ports/agent-target.js';
 import type { CatalogSource } from '@/ports/catalog-source.js';
 import type { FileSystem } from '@/ports/file-system.js';
 import type { Paths } from '@/ports/paths.js';
+import {
+  backupPath,
+  newInstallId,
+  restoreBytes,
+  restoreText,
+  rollback,
+  StaleFileError,
+} from './install-transaction.js';
 import { appendInstall, loadManifest, stateDir } from './journal.js';
 import { readPresent } from './skill-tree.js';
 
@@ -36,8 +43,7 @@ export interface InitRequest {
 
 export class UnknownMcpError extends Error {}
 export class UnknownSkillError extends Error {}
-/** The target changed between planning and applying in a way that alters the plan. */
-export class StaleFileError extends Error {}
+export { StaleFileError };
 /** A resolved env value would be written to disk. */
 export class LeakError extends Error {}
 
@@ -170,39 +176,6 @@ async function missingDirs(fs: FileSystem, paths: string[]): Promise<string[]> {
   return [...found];
 }
 
-/** Puts a text file back as it was; deletes it when it did not exist. */
-const restoreText = (fs: FileSystem, path: string, before: string | null): Promise<void> =>
-  before === null ? fs.remove(path) : fs.writeAtomic(path, before);
-
-const restoreBytes = (fs: FileSystem, path: string, before: Uint8Array | null): Promise<void> =>
-  before === null ? fs.remove(path) : fs.writeBytes(path, before);
-
-/**
- * Reverts the completed writes newest first, then removes the directories the install created, deepest first.
- * Every step is attempted; the original error is returned, annotated when some step could not be reverted.
- * Backups stay on disk.
- */
-async function rollback(
-  fs: FileSystem,
-  undo: (() => Promise<void>)[],
-  dirs: string[],
-  cause: unknown,
-): Promise<unknown> {
-  const failures: string[] = [];
-  const attempt = async (run: () => Promise<unknown>): Promise<void> => {
-    try {
-      await run();
-    } catch (e) {
-      failures.push(e instanceof Error ? e.message : String(e));
-    }
-  };
-  for (const step of undo.reverse()) await attempt(step);
-  for (const dir of dirs) await attempt(() => fs.removeDir(dir));
-  if (failures.length === 0) return cause;
-  const message = cause instanceof Error ? cause.message : String(cause);
-  return new Error(`${message}; rollback incomplete: ${failures.join('; ')}`, { cause });
-}
-
 /** Re-reads, scans for leaked values, backs up, writes atomically and journals every changed file and skill. */
 export async function applyPlan(deps: InitDeps, plan: ChangePlan, opts: { force?: boolean } = {}): Promise<boolean> {
   const { homeDir } = deps.paths;
@@ -220,7 +193,7 @@ export async function applyPlan(deps: InitDeps, plan: ChangePlan, opts: { force?
   assertNoLeak(plan, files, deps.env);
 
   const now = (deps.now ?? (() => new Date()))();
-  const id = `${now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')}-${randomBytes(2).toString('hex')}`;
+  const id = newInstallId(now);
   const steps = skills.flatMap(skillSteps);
   const createdDirs = await missingDirs(
     deps.fs,
@@ -232,13 +205,13 @@ export async function applyPlan(deps: InitDeps, plan: ChangePlan, opts: { force?
   const state = stateDir(homeDir);
   const mcpBackups = new Map<FileChange, string | null>();
   for (const file of files) {
-    const backup = file.before === null ? null : `backups/${id}/${n++}-${basename(file.path)}`;
+    const backup = file.before === null ? null : backupPath(id, n++, file.path);
     if (backup !== null) await deps.fs.writeAtomic(`${state}/${backup}`, file.before!);
     mcpBackups.set(file, backup);
   }
   const skillBackups = new Map<SkillStep, string | null>();
   for (const step of steps) {
-    const backup = step.before === null ? null : `backups/${id}/${n++}-${basename(step.path)}`;
+    const backup = step.before === null ? null : backupPath(id, n++, step.path);
     if (backup !== null) await deps.fs.writeBytes(`${state}/${backup}`, step.before!);
     skillBackups.set(step, backup);
   }
