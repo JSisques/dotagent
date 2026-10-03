@@ -469,6 +469,14 @@ describe('runCli', () => {
       expect(await readFile(mcpFile(), 'utf8')).toBe(edited);
     });
 
+    it('exits 1 and leaves the skill untouched when it holds a symlink, even with --force', async () => {
+      await run('init', '--skills', 'example-skill', '--scope', 'project');
+      await symlink(tmp.root, join(skillDir(), 'link.md'));
+      expect(await run('uninstall', 'example-skill', '--force')).toBe(1);
+      expect(err.join('\n')).toMatch(/^error: /);
+      expect((await readdir(skillDir())).sort()).toEqual(['SKILL.md', 'link.md']);
+    });
+
     it('reports an item that is already absent and exits 0', async () => {
       await run('init', '--skills', 'example-skill', '--scope', 'project');
       await rm(skillDir(), { recursive: true });

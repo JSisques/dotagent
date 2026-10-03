@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, lstat, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FolderCatalogSource } from '@/adapters/catalog/folder-source.js';
@@ -9,7 +9,7 @@ import { loadManifest, manifestPath, stateDir } from '@/application/journal.js';
 import { getStatus } from '@/application/status.js';
 import { undoInstall, UndoSelectionError } from '@/application/undo-install.js';
 import { uninstallItem, UninstallSelectionError, type UninstallRequest } from '@/application/uninstall-item.js';
-import type { FileSystem } from '@/ports/file-system.js';
+import { UnsafeTreeError, type FileSystem } from '@/ports/file-system.js';
 import { DEMO_V1, faultyFs, skillSource } from '@test/helpers/skills.js';
 import { makeTmpPaths, type TmpPaths } from '@test/helpers/tmp-paths.js';
 
@@ -262,6 +262,24 @@ describe('uninstallItem', () => {
       expect(await read(join(root(), 'refs', 'a.md'))).toBe('raced');
       expect(await read(join(root(), 'SKILL.md'))).toBe(SKILL_MD);
       expect(await manifestText()).toBe(before);
+    });
+
+    it('refuses with UnsafeTreeError and changes nothing when the skill holds a symlink, even with --force', async () => {
+      await installSkill();
+      const link = join(root(), 'link.md');
+      await symlink(join(tmp.cwd, 'nowhere'), link);
+      const before = await manifestText();
+      const tree = () => readdir(stateDir(tmp.homeDir), { recursive: true });
+      const stateBefore = await tree();
+      for (const force of [false, true]) {
+        await expect(uninstall({ name: 'demo', force })).rejects.toThrow(UnsafeTreeError);
+      }
+      expect((await lstat(link)).isSymbolicLink()).toBe(true);
+      expect(await readlink(link)).toBe(join(tmp.cwd, 'nowhere'));
+      expect(await read(join(root(), 'SKILL.md'))).toBe(SKILL_MD);
+      expect((await readdir(root())).sort()).toEqual(['SKILL.md', 'assets', 'link.md', 'refs']);
+      expect(await manifestText()).toBe(before);
+      expect(await tree()).toEqual(stateBefore);
     });
 
     it('rolls back the deletions when one fails midway', async () => {
