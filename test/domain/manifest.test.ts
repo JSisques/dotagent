@@ -92,9 +92,8 @@ describe('remove action replay', () => {
   it('an MCP remove drops only the removed entry from ownership', () => {
     const m = manifest([install('a', 'github', 'h1'), install('b', 'fs', 'h2'), removeInstall('c', 'github')]);
     expect(deriveOwnership(m)).toEqual({ '/p/.mcp.json': { fs: 'h2' } });
-    expect(deriveOwnership(manifest([install('a', 'github', 'h1'), removeInstall('c', 'github')]))).toEqual({
-      '/p/.mcp.json': {},
-    });
+    // Removing the last entry of a file leaves no empty per-file map behind.
+    expect(deriveOwnership(manifest([install('a', 'github', 'h1'), removeInstall('c', 'github')]))).toEqual({});
   });
 
   it('a reinstall after a remove owns the item again', () => {

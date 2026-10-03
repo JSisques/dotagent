@@ -77,8 +77,10 @@ export function deriveOwnership(manifest: Manifest): Ownership {
     for (const file of install.files) {
       for (const item of file.items) {
         if (item.kind !== 'mcp') continue;
-        if (item.action === 'remove') delete owned[file.path]?.[item.name];
-        else (owned[file.path] ??= {})[item.name] = item.entryHash;
+        if (item.action === 'remove') {
+          delete owned[file.path]?.[item.name];
+          if (Object.keys(owned[file.path] ?? {}).length === 0) delete owned[file.path];
+        } else (owned[file.path] ??= {})[item.name] = item.entryHash;
       }
     }
   }
